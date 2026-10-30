@@ -1,0 +1,1 @@
+10 a$=input$(3):print "[";a$;"]";len(a$)\nrun\nxyz

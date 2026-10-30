@@ -1,0 +1,1 @@
+10 on interval=10 gosub 100:interval on\n20 if c<5 then 20\n30 interval off:print "done";c\n40 on strig gosub 200:strig(0) on\n50 if f=0 then 50\n60 print "space";f:end\n100 c=c+1:print "i";c;:return\n200 f=1:return\nrun\n  

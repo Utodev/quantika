@@ -1,0 +1,1 @@
+for i=0 to 15:poke &hc000+i,i*3:next\nbsave "cas:bin",&hc000,&hc00f,&hc004\n

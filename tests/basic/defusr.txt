@@ -1,0 +1,1 @@
+10 defusr=&hc000:defusr1=&hc010:a=1:print "ok";a\n20 print hex$(peek(&hf39a)+256*peek(&hf39b));" ";hex$(peek(&hf39c)+256*peek(&hf39d))\nrun\ndefusr2=&h1234:print "direct"\n

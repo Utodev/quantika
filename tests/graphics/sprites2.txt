@@ -1,0 +1,1 @@
+10 screen 2,2:color 15,1,1:cls\n20 a$="":for i=1 to 32:a$=a$+chr$(i*7):next:sprite$(0)=a$\n30 put sprite 0,(50,60),15,0\n40 put sprite 1,(100,30),9,0\n50 goto 50\nrun\n

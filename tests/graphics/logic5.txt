@@ -1,0 +1,1 @@
+10 screen 5:color 15,1,1:cls\n20 line(0,0)-(60,60),5,bf:line(10,10)-(50,50),6,bf,xor:line(0,100)-(200,180),12,,tor:pset(5,190),7,preset\n30 line(100,0)-(150,50),3,bf:line(110,10)-(140,40),12,bf,and:line(160,0)-(200,40),0,bf,tpset:line(120,20)-(250,90),9,b,or\n40 pset(200,200),1,xor:draw "bm200,100c3r20d20"\n50 goto 50\nrun\n

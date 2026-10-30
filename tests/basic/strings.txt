@@ -1,0 +1,1 @@
+a$="hello":b$=a$+" world":print b$;len(b$)\nprint left$(b$,3);"/";right$(b$,5);"/";mid$(b$,4,4)\nprint instr(b$,"o");instr(6,b$,"o");instr(b$,"z")\nprint chr$(65);asc("Z");str$(12);val("3.5")+1\nprint string$(3,"*");space$(2);"|";hex$(255);" ";oct$(8);" ";bin$(5)\n

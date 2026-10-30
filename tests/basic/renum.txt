@@ -1,0 +1,1 @@
+10 goto 30\n20 gosub 40:on x goto 10,20,30\n30 if a then 10 else 50\n40 return 20\n50 restore 30:print "x":run 10\nrenum 100,30,5\nlist\nrenum\nlist\n

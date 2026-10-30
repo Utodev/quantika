@@ -1,0 +1,1 @@
+print using "#.#";.05;.15;.25;.35\nprint using "###";-0.4;0.5;1.5;2.5\nprint using "x";1\nprint using "##.##   ";1,2;3\nprint using ".###";.5;-.5\nprint using "+.##^^^^";123\nprint using "###.";1.5\n

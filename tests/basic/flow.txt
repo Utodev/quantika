@@ -1,0 +1,1 @@
+10 read a,b$,c:print a;b$;c\n20 data 5,"txt",-2.5\n30 restore:read x:print x\n40 on 2 goto 50,60\n50 print "no"\n60 print "yes"\n70 on error goto 100\n80 print 1/0\n90 end\n100 print "err";err;erl:resume next\nrun\n

@@ -1,0 +1,1 @@
+10 screen 5:set page 1,2:a=peek(&hfaf5):b=peek(&hfaf6):c=vdp(2):set page ,3:d=peek(&hfaf5):e=peek(&hfaf6):set page 2:f=peek(&hfaf5):g=peek(&hfaf6)\n30 screen 8:set page 1,1:h=vdp(2):on error goto 50:set page 2:goto 60\n50 i=err:resume 60\n60 screen 2:on error goto 70:set page 0,0:goto 80\n70 j=err:resume 80\n80 screen 0:print a;b;c;d;e;f;g;h;i;j\nrun\n

@@ -1,0 +1,1 @@
+a$="hello"\nprint a$;len(a$)\nprint fre(""):a$="xy":print fre(""):b$=a$+"z":print fre("")\n10 for i=0 to 4:d$=d$+hex$(i)+hex$(i)+hex$(i)+hex$(i)+hex$(i)+hex$(i)+" ":next\n20 print d$;fre("")\nrun\nprint len(hex$(1)+hex$(1)+hex$(1)+hex$(1)+hex$(1)+hex$(1)+hex$(1)+hex$(1)+hex$(1)+hex$(1)+hex$(1)+hex$(1)+hex$(1))\n

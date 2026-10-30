@@ -1,0 +1,1 @@
+print using "#####";1e10;123456789#\nprint using "$###";5\nprint using "##.###";1/3#\nprint using "%##";3\nprint using "#.##";2/3;2/3#\nprint using "####.#";-999.95;999.95\nprint using "**#";-5\n

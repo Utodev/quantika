@@ -1,0 +1,1 @@
+10 screen 2:color 15,1,1:cls\n20 draw "bm20,20c8r30d30l30u30e15f15"\n30 a$="r10d10l10u10":draw "bm60,60c10xa$;bm90,60s8xa$;s4"\n40 i=25:draw "bm120,30c12r=i;d=i;a1r20a2r20a3r20a0"\n50 draw "bm200,100c7nu20nd20nl20nr20ne15nf15ng15nh15"\n60 draw "bm250,180c9r30d30":line(-10,-10)-(300,250),11\n70 x=40:draw "c13bm=x;,150m+30,-20m-10,+30"\n80 goto 80\nrun\n

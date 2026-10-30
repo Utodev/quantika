@@ -1,0 +1,37 @@
+# layout_main.txt: the free areas of main_free.rom and the modules that tools/pack.py places in them.
+# The jump table, the BIOS code included in order after it, the font (1BBFh) and the Math-Pack entries
+# have fixed places; the modules below go wherever they fit.
+
+area FixedCodeEnd 1BBF              # after the BIOS code, up to the font
+area FontAndKeysEnd 268C            # after the font and the key tables, up to the Math-Pack
+gaps common/mathpack.inc 268C 4000  # between the Math-Pack entries, and after them to the end of page 0
+area 4000 73AC                      # page 1 (FBASIC), around the fixed entries of basic/compat.asm
+area 73AF 8000
+
+module basic/bcd.asm any
+module basic/convert.asm any
+module basic/errors.asm any
+module basic/fin.asm any
+module basic/fout.asm any
+module basic/interp.asm any
+module basic/eval.asm any
+module basic/primary.asm any
+module basic/vars.asm any
+module basic/strings.asm any
+module basic/print.asm any
+module basic/outdo.asm page0      # OUTDO (RST 18h) is a BIOS entry
+module bios/traps.asm page0       # (the interrupt's)
+module basic/program.asm any
+module basic/crunch.asm any
+module basic/data.asm any
+module basic/statements.asm any
+module basic/traps.asm any
+module basic/main.asm any
+module data/keywords.asm any
+module basic/transcend.asm any
+module basic/cassette.asm any
+module basic/compatcode.asm any
+module basic/misc.asm any
+module basic/substubs.asm any
+module basic/play.asm any
+module basic/music.asm page0      # PlayMusic runs in the interrupt (a cartridge may be in page 1)

@@ -1,0 +1,1 @@
+10 on error goto 200\n20 open "cas:other" for input as #1\n30 print #1,"x"\n40 print input$(7,#1);eof(1)\n50 print eof(1)\n60 close:print eof(1)\n90 end\n200 print "err";err;erl:resume next\nrun\n

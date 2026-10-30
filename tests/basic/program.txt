@@ -1,0 +1,1 @@
+10 for i=1 to 3:print i;:next\n20 gosub 100:if a>2 then print "big" else print "small"\n30 end\n100 a=a+1:print "sub";a:return\nlist\nrun\nrun\n

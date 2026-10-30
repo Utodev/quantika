@@ -1,0 +1,1 @@
+10 screen 7:color 15,1,1:cls:dim a%(600)\n20 line(10,10)-(40,30),2,bf:circle(25,20),9,3:line(10,10)-(40,30),7\n30 copy(10,10)-(40,30) to a%:copy a% to (60,10):copy a%,1 to (130,10):copy a%,2 to (60,80):copy a%,3 to (130,80),,xor\n40 copy(40,30)-(10,10) to a%:copy a% to (180,100),,tpset\n50 goto 50\nrun\n

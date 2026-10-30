@@ -1,0 +1,1 @@
+10 print "hi":goto 10\n20 a=1\nsave "cas:prog"\n

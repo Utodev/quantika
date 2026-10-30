@@ -1,0 +1,1 @@
+10 screen 1:sprite$(0)=string$(8,255):put sprite 0,(50,50),15,0:on sprite gosub 100:sprite on:for i=0 to 300:next:put sprite 1,(52,52),15,0\n20 if f=0 then 20\n30 screen 0:print "hit";f;peek(&hfc6d)\n40 key(3) on:key(4) stop:on key gosub ,,40:print peek(&hfbd0);peek(&hfbd1);peek(&hfc55);peek(&hfc58):end\n100 f=f+1:sprite off:return\nrun\n

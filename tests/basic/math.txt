@@ -1,0 +1,1 @@
+print sqr(16);sqr(2)>1.41;int(-2.5);fix(-2.5);abs(-3);sgn(-7)\nprint exp(0);log(1);sin(0);cos(0);atn(0);int(exp(1)*1000)\nprint 2^10;10^-2;int(sqr(10)*100)\n

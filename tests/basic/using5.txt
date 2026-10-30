@@ -1,0 +1,1 @@
+print using "#.##";-0.5;-0.004\nprint using "+#";0\nprint using "##.##^^^^";0;-1e-20\nprint using "\\ \\  x";"a";"bcd";\nprint "!"\nprint using "##,";1234\n

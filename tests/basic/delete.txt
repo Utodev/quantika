@@ -1,0 +1,1 @@
+10 goto 70\n20 rem\n30 rem\n40 rem\n50 rem\n60 rem\ndelete 25\ndelete 15-25\ndelete 50\ndelete -30\ndelete 60-\nrenum 5,40\nrenum 35,40\nrenum 100,40,65000\nlist\n

@@ -1,0 +1,1 @@
+10 a=fre(0):gosub 100:for i=1 to 1:c=fre(0):next:print a;b;c\n20 for j=1 to 3:gosub 200:d=d+e:next:print d\n30 end\n100 b=fre(0):return\n200 e=fre(0):return\nrun\nprint fre(0)\n

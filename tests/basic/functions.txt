@@ -1,0 +1,1 @@
+10 def fna(x)=x*2+1:def fnb$(a$,n)=left$(a$,n)\n20 x=5:print fna(3);fna(x);x;fnb$("hello",2)\n30 a$="abcdef":mid$(a$,2,3)="XYZW":print a$\n40 dim z(3):erase z:dim z(5):print "ok"\n50 time=0:print time<5\nrun\n

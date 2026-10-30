@@ -1,0 +1,1 @@
+print using "##.##^^^^";12345.6;-0.00123\nprint using "!";"hello"\nprint using "\\  \\";"hello";"ab"\nprint using "&";"hi"\nprint using "a#b";5;6\nprint using "\\\\x";"abc"\nprint using "##";999;-99\n

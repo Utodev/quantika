@@ -83,25 +83,25 @@ SubInterrupt:
         SUB_ENTRY SubRomBasicBoxFill, BasicHandler
         SUB_ENTRY SubRomBasicLine, BasicHandler
         SUB_ENTRY SubRomBasicBox, BasicHandler
-        SUB_ENTRY SubRomDrawLine, NotWritten
+        SUB_ENTRY SubRomDrawLine, DoGrph
         SUB_ENTRY SubRomGraphicPrint, GraphicPrint
-        SUB_ENTRY SubRomClipXY, NotWritten
-        SUB_ENTRY SubRomMapXY, NotWritten
-        SUB_ENTRY SubRomReadPixel, NotWritten
-        SUB_ENTRY SubRomSetAttribute, NotWritten
-        SUB_ENTRY SubRomSetPixel, NotWritten
-        SUB_ENTRY SubRomPixelRightTest, NotWritten
-        SUB_ENTRY SubRomPixelRight, NotWritten
-        SUB_ENTRY SubRomPixelLeftTest, NotWritten
-        SUB_ENTRY SubRomPixelLeft, NotWritten
-        SUB_ENTRY SubRomPixelDownTest, NotWritten
-        SUB_ENTRY SubRomPixelDown, NotWritten
-        SUB_ENTRY SubRomPixelUpTest, NotWritten
-        SUB_ENTRY SubRomPixelUp, NotWritten
-        SUB_ENTRY SubRomScanRight, NotWritten
-        SUB_ENTRY SubRomScanLeft, NotWritten
-        SUB_ENTRY SubRomBox, NotWritten
-        SUB_ENTRY SubRomBoxFill, NotWritten
+        SUB_ENTRY SubRomClipXY, ScalXY
+        SUB_ENTRY SubRomMapXY, MapXY
+        SUB_ENTRY SubRomReadPixel, ReadC
+        SUB_ENTRY SubRomSetAttribute, SetAtr
+        SUB_ENTRY SubRomSetPixel, SetC
+        SUB_ENTRY SubRomPixelRightTest, TRight
+        SUB_ENTRY SubRomPixelRight, RightC
+        SUB_ENTRY SubRomPixelLeftTest, TLeftC
+        SUB_ENTRY SubRomPixelLeft, LeftC
+        SUB_ENTRY SubRomPixelDownTest, TDownC
+        SUB_ENTRY SubRomPixelDown, DownC
+        SUB_ENTRY SubRomPixelUpTest, TUpC
+        SUB_ENTRY SubRomPixelUp, UpC
+        SUB_ENTRY SubRomScanRight, ScanR
+        SUB_ENTRY SubRomScanLeft, ScanL
+        SUB_ENTRY SubRomBox, NvBxLn
+        SUB_ENTRY SubRomBoxFill, NvBxFl
         SUB_ENTRY SubRomChangeMode, ChangeMode
         SUB_ENTRY SubRomInitText, InitText
         SUB_ENTRY SubRomInitText32, InitText32
@@ -122,9 +122,9 @@ SubInterrupt:
         SUB_ENTRY SubRomCls, ClearScreen
         SUB_ENTRY SubRomClearText, ClearText
         SUB_ENTRY SubRomShowFunctionKeys, ShowFunctionKeys
-        SUB_ENTRY SubRomDeleteLine, NotWritten
-        SUB_ENTRY SubRomInsertLine, NotWritten
-        SUB_ENTRY SubRomPutVram, NotWritten
+        SUB_ENTRY SubRomDeleteLine, DelLno
+        SUB_ENTRY SubRomInsertLine, InsLno
+        SUB_ENTRY SubRomPutVram, PutVrm
         SUB_ENTRY SubRomWriteVdp, WriteVdpReg
         SUB_ENTRY SubRomVdpStatus, VdpStatus
         SUB_ENTRY SubRomKanaLock, NotWritten
@@ -146,13 +146,13 @@ SubInterrupt:
         SUB_ENTRY SubRomBasicVpeek, BasicHandler
         SUB_ENTRY SubRomBasicSet, BasicHandler
         SUB_ENTRY SubRomBeep, Beep
-        SUB_ENTRY SubRomPrompt, NotWritten
-        SUB_ENTRY SubRomScreenFromClock, NotWritten
-        SUB_ENTRY SubRomSetScreen, NotWritten
+        SUB_ENTRY SubRomPrompt, PasswordPrompt
+        SUB_ENTRY SubRomScreenFromClock, ScreenFromClock
+        SUB_ENTRY SubRomSetScreen, ScreenFromClock
         SUB_ENTRY SubRomBasicCopy, BasicHandler
-        SUB_ENTRY SubRomCopyVramVram, NotWritten
-        SUB_ENTRY SubRomCopyRamVram, NotWritten
-        SUB_ENTRY SubRomCopyVramRam, NotWritten
+        SUB_ENTRY SubRomCopyVramVram, BltVV
+        SUB_ENTRY SubRomCopyRamVram, BltVM
+        SUB_ENTRY SubRomCopyVramRam, BltMV
         SUB_ENTRY SubRomCopyDiskVram, NotWritten
         SUB_ENTRY SubRomCopyVramDisk, NotWritten
         SUB_ENTRY SubRomCopyDiskRam, NotWritten
@@ -193,15 +193,23 @@ EntriesEnd:
         jp LineInputFile
         jp InputFileChars
         jp FuncEof
+        jp NSetCx
+        jp PntIni
+        jp StatementGet
+        jp PromptText
+        jp OperandSprite
         assert $ == FrsxServicesEnd
 
         include "sub/main.asm"
         include "sub/screen.asm"
         include "sub/palette.asm"
         include "sub/clock.asm"
+        include "sub/pixel.asm"
+        include "sub/blit.asm"
 ; FBASIC's own code that lives here, and what it needs of the main ROM
         include "basic/graphics.asm"
         include "basic/draw.asm"
+        include "basic/settings.asm"
         include "basic/using.asm"
         include "basic/edit.asm"
         include "basic/copy.asm"

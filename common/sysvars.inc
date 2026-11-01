@@ -410,6 +410,7 @@ RG21SAV       equ $FFF4
 RG22SAV       equ $FFF5
 RG23SAV       equ $FFF6
 MINROM          equ $FFF7       ; slot of the main ROM
+SUBSLT          equ $FFF8       ; this ROM's own copy of EXBRSA (the sub-ROM's slot): a program can overwrite EXBRSA
 RG25SAV         equ $FFFA
 RG26SAV         equ $FFFB
 RG27SAV         equ $FFFC

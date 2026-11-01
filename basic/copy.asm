@@ -1,16 +1,7 @@
-; copy.asm: SET (PAGE; the others with the clock's statements) and COPY between parts of the VRAM.
+; copy.asm: SET PAGE and COPY between parts of the VRAM.
 
-; StatementSet: SET PAGE [display] [, active].
-StatementSet:
-        ld de,PageWord
-        ld b,4
-.letter:
-        ld a,(de)
-        cp (hl)
-        jp nz,SyntaxError
-        inc de
-        inc hl
-        djnz .letter
+; SetPageStatement: SET PAGE [display] [, active] (HL past PAGE: basic/settings.asm reads the word).
+SetPageStatement:
         call MaxPage                    ; (Illegal function call below SCREEN 5)
         call ThisChar
         cp ','
@@ -29,8 +20,6 @@ StatementSet:
         call SetPage
         pop hl
         ret
-PageWord:
-        db "PAGE"
 
 ; PageNumber: a page of the mode. Out: A. Destroys BC, DE.
 PageNumber:

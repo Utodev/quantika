@@ -1,0 +1,1 @@
+10 screen 1:color 2,3,4:width 25:key off:screen ,,0:screen ,,,2:screen ,,,,1:set screen:screen 0:key on:gosub 800:end\n800 for b=2 to 3:out &hb4,13:out &hb5,8+b:for r=0 to 12:out &hb4,r:print hex$(inp(&hb5) and 15);:next:print " ";:next:print:return\n900 print "e";err;erl;:resume next\nrun\n

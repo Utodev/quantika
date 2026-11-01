@@ -5,28 +5,46 @@
 ; S and M (the envelope) are read and ignored. The state of each voice (octave, length, tempo,
 ; volume) stays from one PLAY to the next, in its voice block (VCBA, VCBB, VCBC).
 ;
-; The queues' pointers are in QUETAB: for each voice the put and get offsets (one byte each) and the
-; frames left of the event being played.
+; The queues' pointers are in QUETAB, laid out as the standard has it (the BIOS's LFTQ and PUTQ use them): for
+; each queue (the three voices and a fourth one) the put and get offsets, a byte kept 0, the size less one
+; (7Fh) and the queue's address. The frames left of the event being played are in the voice block.
 
 VoiceOctave     equ 0                   ; (offsets in a voice block)
 VoiceLength     equ 1
 VoiceTempo      equ 2
 VoiceVolume     equ 3
-
-QueueOffsetPut  equ 0                   ; (offsets in a QUETAB entry of 3 bytes)
-QueueOffsetGet  equ 1
-QueueOffsetLeft equ 2
+VoiceFramesLeft equ 4
 
 ; InitMusic: the voices silent, the queues empty, the voice blocks at O4 L4 T120 V8.
 InitMusic:
         xor a
         ld (MUSICF),a
         ld hl,QUETAB
-        ld b,9
+        ld b,24
 .clear:
         ld (hl),$00
         inc hl
         djnz .clear
+        ld hl,QUETAB + 3                ; the voices' queues: size less one, address
+        ld de,VOICAQ
+        ld b,3
+.queue:
+        ld (hl),$7F
+        inc hl
+        ld (hl),e
+        inc hl
+        ld (hl),d
+        inc hl
+        inc hl
+        inc hl
+        inc hl
+        ld a,e
+        add a,$80
+        ld e,a
+        jr nc,.sameHigh
+        inc d
+.sameHigh:
+        djnz .queue
         ld hl,VCBA
         call .voice
         ld hl,VCBB
@@ -40,6 +58,8 @@ InitMusic:
         ld (hl),120
         inc hl
         ld (hl),8
+        inc hl
+        ld (hl),0                       ; (frames left)
         ret
 
 ; StatementPlay: PLAY string [, string [, string]].
@@ -437,8 +457,8 @@ OperandPlay:
         ld a,(hl)
         inc hl
         cp (hl)
-        inc hl
         jr nz,.busy
+        call FramesLeft
         ld a,(hl)
         or a
         jr nz,.busy

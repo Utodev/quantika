@@ -18,6 +18,15 @@ BasicColdStart:
         xor a
         ld (PRTFLG),a
         ld (TRCFLG),a
+        ld hl,USRTAB                    ; USR with no DEFUSR: Illegal function call
+        ld de,IllegalFunction
+        ld b,10
+.usr:
+        ld (hl),e
+        inc hl
+        ld (hl),d
+        inc hl
+        djnz .usr
         call InitMusic
         call NewProgram
         ld hl,BasicBanner
@@ -36,6 +45,10 @@ Ready:
         call ForceTextMode              ; ("Ok" in a text mode)
         call NewLineIfNeeded
         ld hl,OkText
+        call PromptText                 ; (SET PROMPT's text instead, at BUF)
+        jr nz,.prompt
+        ld hl,BUF
+.prompt:
         call PrintString
 DirectLoop:
         ld sp,(STKTOP)

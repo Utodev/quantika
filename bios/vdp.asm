@@ -50,18 +50,26 @@ SetVramWrite:
 SetVramRead:
         xor a
 SetVramAddress:
-        push hl
         push af
         ld a,(SCRMOD)
         cp $05
         jr nc,.bigAddress
-        res 7,h                         ; the TMS9918 modes see 16K
-        res 6,h
+        pop af                          ; the TMS9918 modes see 16K: the 14 bits only (R#14 stays at 0,
+        push bc                         ; as CHGMOD leaves it; nothing is written in memory: a program
+        ld c,a                          ; may have its stack at RG14SAV, as Galaxian does)
+        di
+        ld a,l
+        out (VdpCommand),a
+        ld a,h
+        and $3F
+        or c
+        out (VdpCommand),a
+        ei
+        pop bc
+        ret
 .bigAddress:
         pop af
-        call SetVramBig
-        pop hl
-        ret
+        jp SetVramBig
 
 ; SetVramWriteBig / SetVramReadBig: NSTWRT / NSETRD. In: HL = VRAM address (64K, with R#14).
 ; Destroys AF.
@@ -209,6 +217,11 @@ ChangeColours:
 ChangeScreenMode:
         cp $04
         jr nc,.subRom
+        push hl                         ; the aspect for CIRCLE (GTASPC): 1 (SCREEN 4-8: the sub-ROM's)
+        ld hl,$0100
+        ld (ASPCT1),hl
+        ld (ASPCT2),hl
+        pop hl
         or a
         jp z,InitText40
         dec a
@@ -232,6 +245,13 @@ ChangeScreenMode:
 ; In: B = R#0 mode bits (M3 = 02h), D = R#1 mode bits (M1 = 10h text, M2 = 08h multicolour).
 ; Destroys AF, BC.
 ModeRegisters:
+        xor a                           ; R#14 = 0: the TMS9918 modes' addresses (SetVramAddress)
+        ld (RG14SAV),a
+        di
+        out (VdpCommand),a
+        ld a,$8E
+        out (VdpCommand),a
+        ei
         ld a,(RG0SAV)
         and $F1
         or b
@@ -248,6 +268,28 @@ ModeRegisters:
 ; TableRegisters: R#2-R#6 from a table of five addresses in the work area (name, colour, patterns,
 ; sprite attributes, sprite patterns). In: HL = the work area's table. Destroys AF, BC, DE, HL.
 TableRegisters:
+        push hl                         ; the current screen's tables, as the standard keeps them: names
+        push bc                         ; and characters (and in SCREEN 1-3 sprite patterns, attributes)
+        ld de,NAMBAS
+        ldi
+        ldi
+        inc hl
+        inc hl
+        ld de,CGPBAS
+        ldi
+        ldi
+        ld a,(SCRMOD)
+        or a
+        jr z,.basesDone
+        ld de,ATRBAS
+        ldi
+        ldi
+        ld de,PATBAS
+        ldi
+        ldi
+.basesDone:
+        pop bc
+        pop hl
         ld e,(hl)                       ; name table: address / 400h
         inc hl
         ld d,(hl)
@@ -493,12 +535,67 @@ ClearGraphic:
         ld bc,$1800
         jp FillVram
 
-; LoadFont: the character set (FontData, 2K) to VRAM. In: HL = pattern table. Destroys all.
+; LoadFont: the character set CGPNT names (its slot, then its address; 2K) to VRAM, as the standard
+; does: a program may put its own one there. This ROM's own is copied at once, any other read through
+; RDSLT. In: HL = pattern table. Destroys all.
 LoadFont:
-        ex de,hl
-        ld hl,FontData
+        ld a,(CGPNT)
+        ld de,(CGPNT + 1)
+        or a
+        jr nz,.slot
+        ld a,d
+        and $C0
+        jr nz,.slot
+        ex de,hl                        ; (slot 0, page 0: this ROM)
         ld bc,$0800
         jp CopyRamToVram
+.slot:
+        call SetVramWrite
+        ex de,hl                        ; HL = the character set
+        ld bc,$0800
+.byte:
+        push bc
+        push hl
+        ld a,(CGPNT)
+        call ReadSlot
+        out (VdpData),a
+        pop hl
+        pop bc
+        inc hl
+        dec bc
+        ld a,b
+        or c
+        jr nz,.byte
+        ei
+        ret
+
+; FontPattern: the 8 bytes of character A in the character set CGPNT names, to PATWRK (the sub-ROM's
+; GETPAT). Destroys all.
+FontPattern:
+        ld l,a
+        ld h,$00
+        add hl,hl
+        add hl,hl
+        add hl,hl
+        ld de,(CGPNT + 1)
+        add hl,de
+        ld de,PATWRK
+        ld b,$08
+.byte:
+        push bc
+        push de
+        push hl
+        ld a,(CGPNT)
+        call ReadSlot
+        pop hl
+        pop de
+        pop bc
+        ld (de),a
+        inc hl
+        inc de
+        djnz .byte
+        ei
+        ret
 
 ; ClearSprites: CLRSPR. Sprite patterns to 0, every sprite off the screen with pattern n (or 4n for
 ; 16 x 16 sprites) and the foreground colour. Destroys all.

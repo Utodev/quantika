@@ -15,7 +15,8 @@
 
 HalfTimeout     equ $00                 ; 256 loops (about 3 ms) without an edge: no signal
 HeaderCycles    equ 200                 ; short halves in a row that make a header
-StopCheckLoops  equ 12                  ; loops that CheckCtrlStop takes when nothing is pressed
+PilotLag        equ 3                   ; loops a header's half is measured short by (TapeInStart)
+StopCheckLoops  equ 12                 ; loops that CheckCtrlStop takes when nothing is pressed
 JunctionLoops   equ 9                   ; loops the caller takes between two bytes (TAPOUT's return to
                                         ; its next call)
 
@@ -33,7 +34,9 @@ TapeInStart:
         jr c,.silence
         ld h,HeaderCycles               ; H = halves still wanted
         ld de,$0000                     ; DE = their total length
-        ld l,$00                        ; L = the length of the first half: the reference
+        ld l,$00                        ; L = the length of the half before: the reference (the first
+                                        ; one is timed with less lag than the others, so each is
+                                        ; compared with the one before it)
 .half:
         call ReadHalf
         jr nc,.edge
@@ -49,10 +52,10 @@ TapeInStart:
         jr .half
 .compare:
         push bc                         ; (B is the input level)
-        ld a,l                          ; within a quarter of the reference (and one)?
+        ld a,l                          ; within a quarter of the reference (and two)?
         srl a
         srl a
-        inc a
+        add a,2
         ld b,a
         ld a,c
         sub l
@@ -68,10 +71,15 @@ TapeInStart:
         jr nc,.noCarry
         inc d
 .noCarry:
+        ld l,c
         dec h
         jr nz,.half
-        ; DE / 200 = the short half; the limit is one and a half of it: DE * 3 / 400
+        ; DE / 200 = the short half; the limit is one and a half of it: DE * 3 / 400. Each half here
+        ; counts PilotLag loops less than TAPIN will (this loop's own instructions take that much of
+        ; the next half): they are added back, or a fast tape's short halves would reach the limit
         ex de,hl
+        ld de,HeaderCycles * PilotLag
+        add hl,de
         ld d,h
         ld e,l
         add hl,hl

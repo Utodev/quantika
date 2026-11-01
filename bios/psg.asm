@@ -13,8 +13,11 @@ InitPsg:
         ld a,PsgMixer
         ld e,$B8                        ; tones on, noise off, port A in, port B out
         call WritePsg
+        ld a,11
+        ld e,$0B                        ; the envelope's period (as the original leaves it)
+        call WritePsg
         ld a,PsgPortB
-        ld e,$8F                        ; kana lamp off, joystick port 1, all pins high
+        ld e,$CF                        ; kana lamp off, joystick port 2, all pins high (as the original)
         jp WritePsg
 
 ; WritePsg: WRTPSG. In: A = register, E = value. Preserves all.

@@ -28,21 +28,21 @@
         MATH_ENTRY MFM, MoveToDac
         MATH_ENTRY MMF, MoveDacTo
         MATH_ENTRY MOV8HD, Move8Reverse
-        MATH_ENTRY XTF, MathNotYet
-        MATH_ENTRY PHA, MathNotYet
-        MATH_ENTRY PHF, MathNotYet
-        MATH_ENTRY PPA, MathNotYet
-        MATH_ENTRY PPF, MathNotYet
+        MATH_ENTRY XTF, MathXtf
+        MATH_ENTRY PHA, MathPha
+        MATH_ENTRY PHF, MathPhf
+        MATH_ENTRY PPA, MathPpa
+        MATH_ENTRY PPF, MathPpf
         MATH_ENTRY SIGN, SignOfDac
         MATH_ENTRY ABSFN, AbsDac
         MATH_ENTRY NEG, NegateRealDac
         MATH_ENTRY SGN, SgnDac
-        MATH_ENTRY PUSHF, MathNotYet
+        MATH_ENTRY PUSHF, MathPushf
         MATH_ENTRY MOVFM, MoveSingleToDac
-        MATH_ENTRY MOVFR, MathNotYet
-        MATH_ENTRY MOVRF, MathNotYet
-        MATH_ENTRY MOVRMI, MathNotYet
-        MATH_ENTRY MOVRM, MathNotYet
+        MATH_ENTRY MOVFR, MathMovfr
+        MATH_ENTRY MOVRF, MathMovrf
+        MATH_ENTRY MOVRMI, MathMovrmi
+        MATH_ENTRY MOVRM, MathMovrm
         MATH_ENTRY MOVMF, MoveDacToSingle
         MATH_ENTRY MOVE, MoveSingleReverse
         MATH_ENTRY VMOVAM, MoveVtToArg
@@ -72,10 +72,10 @@
         xor a
         assert $ == PUFOUT
         MATH_ENTRY PUFOUT, FormatNumber
-        MATH_ENTRY FOUTB, MathNotYet
-        MATH_ENTRY FOUTO, MathNotYet
-        MATH_ENTRY FOUTH, MathNotYet
-        MATH_ENTRY SGNEXP, MathNotYet
-        MATH_ENTRY DBLEXP, MathNotYet
-        MATH_ENTRY INTEXP, MathNotYet
+        MATH_ENTRY FOUTB, MathFoutb
+        MATH_ENTRY FOUTO, MathFouto
+        MATH_ENTRY FOUTH, MathFouth
+        MATH_ENTRY SGNEXP, MathSgnexp
+        MATH_ENTRY DBLEXP, MathDblexp
+        MATH_ENTRY INTEXP, MathIntexp
 MathPackEnd:

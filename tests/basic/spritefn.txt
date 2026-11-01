@@ -1,0 +1,1 @@
+10 screen 1,2:a$="":for i=1 to 32:a$=a$+chr$(i*7):next:sprite$(3)=a$:b$=sprite$(3):c$=sprite$(4)\n20 screen 1,0:d$=sprite$(1):screen 0:print a$=b$;len(b$);len(c$);len(d$);asc(c$);asc(mid$(b$,32))\nrun\n

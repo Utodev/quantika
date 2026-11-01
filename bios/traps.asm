@@ -100,13 +100,15 @@ InterruptTraps:
         ld (INTCNT),hl
 .noInterval:
         ld b,$00                        ; STRIG(0)-(4): while a trigger is down
+        ld hl,TRPTBL + 3 * TrapStrig
 .trigger:
-        ld a,b
-        add a,TrapStrig
-        call TrapEntry
         ld a,(hl)
+        inc hl
+        inc hl
+        inc hl
         and (1 << TrapOn) | (1 << TrapStopped)
         jr z,.nextTrigger
+        push hl
         ld a,b
         or a
         jr nz,.joystick
@@ -120,10 +122,12 @@ InterruptTraps:
         pop bc
         or a
 .pressed:
-        jr z,.nextTrigger
+        jr z,.triggerDone
         ld a,b
         add a,TrapStrig
         call RaiseTrap
+.triggerDone:
+        pop hl
 .nextTrigger:
         inc b
         ld a,b

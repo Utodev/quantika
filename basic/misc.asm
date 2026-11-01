@@ -409,8 +409,9 @@ UsrNumber:
         pop hl
         ret
 
-; OperandUsr: USR[n](argument): calls the machine code at USRTAB n with the argument in DAC (VALTYP)
-; and HL = DAC; the routine leaves its result there.
+; OperandUsr: USR[n](argument): calls the machine code at USRTAB n with the argument in DAC (VALTYP),
+; HL = DAC, A = VALTYP and, for a string, DE = its descriptor (as the original: programs take them
+; there); the routine leaves its result in DAC.
 OperandUsr:
         call UsrNumber
         push de
@@ -429,8 +430,13 @@ OperandUsr:
         ld de,.back
         push de
         push hl
+        ld a,(VALTYP)
+        cp TypeString
+        jr nz,.go                       ; (a number: DE is the return, as the original leaves it)
+        ld de,(DAC + 2)
+.go:
         ld hl,DAC
-        ret                             ; to it, HL = DAC
+        ret                             ; to it
 .back:
         pop hl
         ret

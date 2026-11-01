@@ -52,14 +52,11 @@ GraphicColour:
         jr nz,.done
         rst $10
         cp ','
-        jr z,.back                      ; ",," : the default, a comma is still there
+        jr z,.done                      ; ",,": the default; HL on the second comma, the next argument's
         call AtStatementEnd
         jr z,.done
         call EvalByte
         ld (ATRBYT),a
-        jr .done
-.back:
-        dec hl                          ; (leave the second comma for the next argument)
 .done:
         pop de
         pop bc
@@ -318,36 +315,30 @@ PixelAddress:
 
 ; PlotPixel: pixel BC, DE (clipped) to the colour ATRBYT.
 PlotPixel:
+        ld a,(SCRMOD)
+        cp $02
+        jr z,.tms
+        cp $04
+        jr z,.tms
         call Clip
         ret c
         ld a,(SCRMOD)
         cp $05
         jr nc,.bitmap
-        cp $03
-        jr z,.multicolour
-        call PixelAddress               ; SCREEN 2: the pattern bit and the colour of the byte
-        push hl
-        push af
-        ld de,(GRPCGP)
-        add hl,de
-        call ReadVram
-        pop bc
-        or b
-        call WriteVram
-        pop hl
-        ld de,(GRPCOL)
-        add hl,de
-        call ReadVram
-        and $0F
-        ld b,a
+        jr .multicolour
+.tms:                                   ; SCREEN 2 and 4: the pattern bit and the colour of the byte
+        ld a,b
+        or d
+        ret nz                          ; (off the screen)
+        ld a,e
+        cp 192
+        ret nc
+        call PixelAddress
+        ld b,a                          ; B = the bit
         ld a,(ATRBYT)
-        rlca
-        rlca
-        rlca
-        rlca
-        and $F0
-        or b
-        jp WriteVram
+        and $0F
+        ld c,a
+        jp TmsSetBits
 .multicolour:
         call PixelAddress
         ld de,(MLTCGP)
@@ -380,6 +371,82 @@ PlotPixel:
         and b
         or e
         jp WriteVramBig
+
+; TmsSetBits: SCREEN 2 and 4: the pixels of mask B in the byte at offset HL (of the pattern and colour
+; tables) to colour C, the standard's way: the colour the byte's 1 pixels have: those bits set; the
+; colour its 0 pixels have: cleared; another one: set, the 1 colour changed - but when the byte would be
+; all 1s then cleared, the 0 colour changed. Destroys all.
+TmsSetBits:
+        push hl
+        ld de,(GRPCOL)
+        add hl,de
+        call ReadVram
+        ld d,a                          ; D = the colours
+        pop hl
+        push hl
+        push de
+        ld de,(GRPCGP)
+        add hl,de
+        call ReadVram
+        pop de
+        ld e,a                          ; E = the pattern
+        ld a,d
+        rrca
+        rrca
+        rrca
+        rrca
+        and $0F
+        cp c
+        jr z,.setBits                   ; the 1 colour
+        ld a,d
+        and $0F
+        cp c
+        jr z,.clearBits                 ; the 0 colour
+        ld a,e
+        or b
+        cp $FF
+        jr z,.newBackground
+        ld e,a                          ; set, the 1 colour changed
+        ld a,c
+        rlca
+        rlca
+        rlca
+        rlca
+        ld c,a
+        ld a,d
+        and $0F
+        or c
+        ld d,a
+        jr .write
+.newBackground:                         ; cleared, the 0 colour changed
+        ld a,d
+        and $F0
+        or c
+        ld d,a
+.clearBits:
+        ld a,b
+        cpl
+        and e
+        ld e,a
+        jr .write
+.setBits:
+        ld a,e
+        or b
+        ld e,a
+.write:
+        pop hl
+        push hl
+        push de
+        ld de,(GRPCGP)
+        add hl,de
+        pop de
+        ld a,e
+        call WriteVram
+        pop hl
+        ld bc,(GRPCOL)
+        add hl,bc
+        ld a,d
+        jp WriteVram
 
 ; VdpPset: pixel BC, DE of the active page to ATRBYT with the logical operation LOGOPR (0 PSET, 1 AND,
 ; 2 OR, 3 XOR, 4 PRESET = NOT, + 8 the T ones: colour 0 draws nothing): the VDP's PSET command.
@@ -806,6 +873,8 @@ FilledBox:
         jp nc,VdpFilledBox
         cp $02
         jr z,FilledBoxScreen2
+        cp $04
+        jr z,FilledBoxScreen2
         ld hl,(GRPACY)                  ; a line for each y from the smaller to the larger
         call OrderPair                  ; DE = smaller, HL = larger
 .row:
@@ -826,7 +895,7 @@ FilledBox:
         inc de
         jr .row
 
-; FilledBoxScreen2: in SCREEN 2 the bytes the box covers whole get the colour as their background
+; FilledBoxScreen2: in SCREEN 2 and 4 the bytes the box covers whole get the colour as their background
 ; (the pattern cleared), as the original BASIC does; the pixels of the bytes at the edges one by one.
 FilledBoxScreen2:
         ld hl,(GRPACX)
@@ -874,14 +943,8 @@ FilledBoxScreen2:
         pop hl
         ld de,(GRPCOL)
         add hl,de
-        ld a,(ATRBYT)
+        ld a,(ATRBYT)                   ; (0c: the foreground 0)
         and $0F
-        ld b,a
-        rlca
-        rlca
-        rlca
-        rlca
-        or b
         call WriteVram
 .wholeDone:
         pop de
@@ -1769,7 +1832,9 @@ PaintFill:
 ; over it gets a seed. The seeds go above the buffer.
 PaintBuffer     equ CENCNT              ; (the CIRCLE work area: not in use) pixel 0 of the buffer
 PaintSeeds      equ CNPNTS              ; the bottom of the seed stack
-PaintCached     equ CXOFF               ; the row in the buffer (FFFFh: none)
+PaintCached     equ CXOFF               ; the row buffers (PaintLoadRow)
+PaintRows       equ 4                   ; how many (1 when there is not room for them)
+PaintBufferExtra equ 4                  ; a buffer's bytes besides its pixels: its row, 2 border pixels
 PaintLeft       equ LOHCNT              ; the run
 PaintRight      equ SKPCNT
 PaintY          equ MOVCNT
@@ -1778,34 +1843,61 @@ PaintWidth      equ LFPROG              ; (LFPROG, RTPROG) the screen's width
 PaintHeight     equ CSAVEM
 
 PaintFillBitmap:
-        ld a,(SCRMOD)                   ; (SCREEN 2: the rows are read from the patterns and colours,
-        cp $05                          ; the runs drawn a pixel at a time)
-        jr c,.buffer
+        ld a,(SCRMOD)
+        cp $05
+        jp c,PaintFillTms
         ld a,(PaintColour)              ; the border is the paint's colour: the VDP finds the runs
         ld h,a
         ld a,(PaintColour + 1)
         cp h
         jp z,PaintFillSearch
-.buffer:
         push bc
         push de
         call ScreenSize
         ld (PaintWidth),hl
         ld a,e
         ld (PaintHeight),a
-        ld hl,(STREND)                  ; the buffer: a border pixel, the pixels, a border pixel
+        ld hl,(PaintWidth)              ; PaintRows buffers when they leave room enough, else 1
+        ld de,PaintBufferExtra
+        add hl,de
+        add hl,hl
+        add hl,hl
+        ld de,$0200                     ; (and seeds)
+        add hl,de
+        ex de,hl
+        ld hl,(STREND)
+        add hl,de
+        ex de,hl
+        ld hl,$0000
+        add hl,sp
+        rst $20
+        ld b,PaintRows
+        jr nc,.room
+        ld b,1
+.room:
+        ld hl,(STREND)                  ; the buffers: which one went last, how many, then for each its
+        ld (PaintCached),hl             ; row (none: FFFFh), a border pixel, the pixels, a border pixel
+        ld a,b
+        dec a
+        ld (hl),a
+        inc hl
+        ld (hl),b
+        inc hl
+.buffers:
+        ld (hl),$FF
+        inc hl
+        ld (hl),$FF
+        inc hl
         ld a,(PaintColour + 1)
         ld (hl),a
         inc hl
-        ld (PaintBuffer),hl
         ld de,(PaintWidth)
         add hl,de
         ld (hl),a
         inc hl
+        djnz .buffers
         ld (PaintSeeds),hl
         ld (LOHADR),hl
-        ld hl,$FFFF
-        ld (PaintCached),hl
         pop de
         pop bc
         call PushSeed
@@ -1880,23 +1972,7 @@ PaintFillBitmap:
         ld de,(PaintY)
         ld (GRPACY),de
         ld bc,(PaintLeft)
-        ld a,(SCRMOD)
-        cp $05
-        jr c,.pixels
         call VdpLine
-        jr .drawn
-.pixels:
-        push bc
-        push de
-        call PlotPixel
-        pop de
-        pop bc
-        ld hl,(PaintRight)
-        or a
-        sbc hl,bc
-        inc bc
-        jr nz,.pixels
-.drawn:
         ld de,(PaintY)                  ; the row above
         ld a,d
         or e
@@ -1910,6 +1986,265 @@ PaintFillBitmap:
         cp e
         call nz,PaintSeedRow
         jp .next
+
+; PaintFillTms: PAINT in SCREEN 2 and 4 from BC, DE. The border is the paint's colour there, so the
+; runs are found on the screen itself, from the colours and pattern of each byte (TmsFillable), and
+; drawn a byte at a time (PaintRunTms). The seeds go on a stack from STREND up.
+TmsColumn       equ PaintCached         ; the byte TmsFillable read last: row, column (FFFFh: none)
+TmsFillableBits equ PaintBuffer         ; its pixels not of the paint's colour
+
+PaintFillTms:
+        push bc
+        push de
+        call ScreenSize
+        ld a,e
+        ld (PaintHeight),a
+        ld hl,(STREND)
+        ld (PaintSeeds),hl
+        ld (LOHADR),hl
+        pop de
+        pop bc
+        call PushSeed
+.next:
+        ld hl,(LOHADR)                  ; no seeds left?
+        ld de,(PaintSeeds)
+        rst $20
+        ret z
+        call PopSeed                    ; BC, DE
+        ld (PaintY),de
+        ld hl,$FFFF                     ; (the screen may have changed since the last read)
+        ld (TmsColumn),hl
+        call TmsFillable
+        jr z,.next                      ; (painted since it was seeded)
+        push bc
+.left:
+        ld a,c
+        or a
+        jr z,.leftEnd
+        dec c
+        call TmsFillable
+        jr nz,.left
+        inc c
+.leftEnd:
+        ld (PaintLeft),bc
+        pop bc
+.right:
+        ld a,c
+        inc a
+        jr z,.rightEnd                  ; (x 255)
+        inc c
+        call TmsFillable
+        jr nz,.right
+        dec c
+.rightEnd:
+        ld (PaintRight),bc
+        ld (GRPACX),bc                  ; drawn
+        ld (GRPACY),de
+        ld bc,(PaintLeft)
+        call PaintRunTms
+        ld hl,$FFFF
+        ld (TmsColumn),hl
+        ld de,(PaintY)                  ; the row above
+        ld a,e
+        or a
+        jr z,.below
+        dec e
+        call TmsSeedRow
+.below:
+        ld de,(PaintY)                  ; the row below
+        inc e
+        ld a,(PaintHeight)
+        cp e
+        call nz,TmsSeedRow
+        jr .next
+
+; TmsSeedRow: row DE over (or under) the run: a seed at the start of every run of fillable pixels in it.
+TmsSeedRow:
+        ld bc,(PaintLeft)
+        ld h,$00                        ; H: in a run
+.pixel:
+        call TmsFillable
+        jr z,.outside
+        ld a,h
+        or a
+        jr nz,.on
+        push bc
+        push de
+        call PushSeed
+        pop de
+        pop bc
+        ld h,$01
+        jr .on
+.outside:
+        ld h,$00
+.on:
+        ld a,(PaintRight)
+        cp c
+        ret z
+        inc c
+        jr .pixel
+
+; TmsFillable: NZ when pixel BC, DE (SCREEN 2, 4) is not of the paint's colour. The byte's pixels are
+; kept (TmsColumn) for the next pixels. Keeps BC, DE, HL.
+TmsFillable:
+        push hl
+        push bc
+        ld a,c
+        rrca
+        rrca
+        rrca
+        and $1F
+        ld b,a                          ; B = the column
+        ld hl,(TmsColumn)
+        ld a,l
+        cp e
+        jr nz,.read
+        ld a,h
+        cp b
+        jr z,.cached
+.read:
+        ld l,e
+        ld h,b
+        ld (TmsColumn),hl
+        push de
+        ld a,e                          ; HL = (y AND F8h) * 32 + column * 8 + (y AND 7)
+        rrca
+        rrca
+        rrca
+        and $1F
+        ld h,a
+        ld a,b
+        add a,a
+        add a,a
+        add a,a
+        ld l,a
+        ld a,e
+        and $07
+        or l
+        ld l,a
+        push hl
+        ld de,(GRPCOL)
+        add hl,de
+        call ReadVram
+        pop hl
+        push af                         ; the colours
+        ld de,(GRPCGP)
+        add hl,de
+        call ReadVram
+        ld e,a                          ; E = the pattern
+        pop af
+        ld d,a                          ; D = the colours
+        ld a,(PaintColour)
+        ld c,a
+        ld b,$00                        ; B = the pixels of the paint's colour
+        ld a,d
+        rrca
+        rrca
+        rrca
+        rrca
+        and $0F
+        cp c
+        jr nz,.background
+        ld b,e
+.background:
+        ld a,d
+        and $0F
+        cp c
+        jr nz,.bits
+        ld a,e
+        cpl
+        or b
+        ld b,a
+.bits:
+        ld a,b
+        cpl
+        ld (TmsFillableBits),a
+        pop de
+.cached:
+        pop bc
+        push bc
+        ld a,c
+        and $07
+        ld b,a
+        ld a,(TmsFillableBits)
+        jr z,.got
+.shift:                                 ; the pixel's bit to bit 7
+        add a,a
+        djnz .shift
+.got:
+        and $80
+        pop bc
+        pop hl
+        ret
+
+; PaintRunTms: SCREEN 2 and 4: the run from x BC to PaintRight of row DE, a byte at a time: a whole byte
+; gets pattern 0 and the colour as its background (0c), a part of one its pixels set as PSET sets them
+; (TmsSetBits), as the original leaves them.
+PaintRunTms:
+        ld a,c
+        or $07
+        ld h,a                          ; H = the run's last x in this byte
+        ld a,(PaintRight)
+        cp h
+        jr nc,.last
+        ld h,a
+.last:
+        ld a,c
+        call .bit
+        add a,a
+        dec a
+        ld l,a                          ; L = the first pixel's bit and those after it
+        ld a,h
+        call .bit
+        dec a
+        cpl
+        and l                           ; A = the run's bits in the byte
+        push hl
+        push de
+        push af
+        ld b,$00
+        call PixelAddress               ; HL = the byte
+        pop bc                          ; B = the run's bits in it
+        ld a,b
+        inc a
+        jr z,.whole
+        ld a,(ATRBYT)                   ; a part of one: as PSET does
+        and $0F
+        ld c,a
+        call TmsSetBits
+        jr .written
+.whole:                                 ; a whole byte: pattern 0, the colour as the background (as the
+        push hl                         ; original's PAINT leaves it)
+        ld de,(GRPCGP)
+        add hl,de
+        xor a
+        call WriteVram
+        pop hl
+        ld de,(GRPCOL)
+        add hl,de
+        ld a,(ATRBYT)
+        and $0F
+        call WriteVram
+.written:
+        pop de
+        pop hl
+        ld a,(PaintRight)
+        cp h
+        ret z                           ; (the run's end)
+        ld a,h
+        inc a
+        ld c,a
+        ld b,$00
+        jr PaintRunTms
+.bit:                                   ; A = 80h >> (A AND 7)
+        and $07
+        ld b,a
+        ld a,$80
+        ret z
+.shift:
+        rrca
+        djnz .shift
+        ret
 
 ; PaintFillSearch: PAINT in SCREEN 5-8 when the border is the paint's colour: a pixel is fillable when it
 ; is of another colour, so the VDP's SRCH command finds the ends of a run and of the runs over and under
@@ -2120,21 +2455,69 @@ PaintSeedRow:
         jr nz,.inside
         ret
 
-; PaintLoadRow: row DE of the screen into the buffer, a byte a pixel (unless it is there already).
-; Keeps BC, DE, HL.
+; PaintLoadRow: row DE of the screen into a buffer, a byte a pixel, PaintBuffer = it (the last PaintRows
+; rows stay: one of them is not read again). Keeps BC, DE, HL.
 PaintLoadRow:
-        push hl
-        ld hl,(PaintCached)
-        rst $20
-        pop hl
-        ret z
         push bc
         push de
         push hl
-        ld (PaintCached),de
-        ld a,(SCRMOD)
-        cp $05
-        jr c,.screen2
+        ld hl,(PaintCached)
+        inc hl
+        ld b,(hl)                       ; how many
+        inc hl                          ; the first buffer's row
+.find:
+        ld a,(hl)
+        cp e
+        jr nz,.notThis
+        inc hl
+        ld a,(hl)
+        dec hl
+        cp d
+        jr z,.found
+.notThis:
+        call .nextBuffer
+        djnz .find
+        ld hl,(PaintCached)             ; not there: the next buffer in turn
+        ld a,(hl)
+        inc a
+        inc hl
+        cp (hl)
+        dec hl
+        jr c,.turn
+        xor a
+.turn:
+        ld (hl),a
+        inc hl
+        inc hl
+        or a
+        jr z,.this
+        ld b,a
+.skip:
+        call .nextBuffer
+        djnz .skip
+.this:
+        ld (hl),e
+        inc hl
+        ld (hl),d
+        inc hl
+        inc hl
+        ld (PaintBuffer),hl
+        jr .read
+.found:
+        inc hl
+        inc hl
+        inc hl
+        ld (PaintBuffer),hl
+        jp .loaded
+.nextBuffer:                            ; HL: the next buffer's row
+        push de
+        ld de,(PaintWidth)
+        add hl,de
+        ld de,PaintBufferExtra
+        add hl,de
+        pop de
+        ret
+.read:
         call VdpWaitCommand             ; (a run may still be being drawn)
         ld h,e                          ; y * 256 (SCREEN 7, 8: a page is 64K) or y * 128 (5, 6: 32K)
         ld l,$00
@@ -2203,59 +2586,6 @@ PaintLoadRow:
         pop de
         pop bc
         ret
-.screen2:                               ; 32 bytes of pattern and of colour: a pixel is the colour's
-        ld a,e                          ; high nibble where its bit is set, else the low one
-        rrca
-        rrca
-        rrca
-        and $1F
-        ld h,a
-        ld a,e
-        and $07
-        ld l,a                          ; HL = the row's first byte, (y AND F8h) * 32 + (y AND 7)
-        ld de,(PaintBuffer)
-        ld b,32
-.column:
-        push bc
-        push hl
-        ld bc,(GRPCOL)
-        add hl,bc
-        xor a
-        call SetVramAddress
-        in a,(VdpData)
-        ld c,a                          ; C = the colours
-        pop hl
-        push hl
-        push bc
-        ld bc,(GRPCGP)
-        add hl,bc
-        xor a
-        call SetVramAddress
-        pop bc
-        in a,(VdpData)
-        ld b,8                          ; A = the pattern
-.bit:
-        rlca
-        push af
-        ld a,c
-        jr nc,.background
-        rrca
-        rrca
-        rrca
-        rrca
-.background:
-        and $0F
-        ld (de),a
-        inc de
-        pop af
-        djnz .bit
-        pop hl
-        ld bc,8
-        add hl,bc
-        pop bc
-        djnz .column
-        jr .loaded
-
 ; SetVramRead17: VRAM reads from HL with bit 16 of the address in D. Destroys AF, D.
 SetVramRead17:
         ld a,h
@@ -2367,7 +2697,7 @@ SpriteTablesAny:
 ; StatementPutSprite: PUT SPRITE n [, (x, y)] [, colour] [, pattern].
 StatementPut:
         cp TkSprite
-        jp nz,SyntaxError
+        jp nz,.file                     ; (PUT [#] n: a file's)
         rst $10
         call EvalByte
         cp 32
@@ -2462,6 +2792,17 @@ StatementPut:
         call WriteVramBig
         pop hl
         ret
+.file:                                  ; PUT # n: a disk ROM's (H_DGET; without one File not OPEN, else
+        ld c,TkPut                      ; Illegal function call)
+        ld iy,H_DGET
+        call FileHook
+        ret nc
+        call FileNumber
+        ld a,(de)
+        or a
+        jp nz,IllegalFunction
+        ld e,ErrFileNotOpen
+        jp RaiseError
 SpriteNumber    equ TEMP3
 PutSpriteAttribute equ TEMP2
 
@@ -2519,6 +2860,53 @@ StatementSprite:
         ret
 .zero:
         out (VdpData),a
+        djnz .byte
+        pop hl
+        ret
+
+; OperandSprite: SPRITE$(n) as an operand: sprite pattern n (8 bytes, 32 for 16 x 16 sprites) as a string.
+OperandSprite:
+        rst $08
+        db '$'
+        call ParenInteger
+        ld a,d
+        or a
+        jp nz,IllegalFunction
+        push hl
+        ld a,(RG1SAV)                   ; 8 or 32 bytes a pattern
+        and $02
+        ld c,8
+        jr z,.size
+        ld c,32
+.size:
+        push bc
+        ld l,e
+        ld h,$00
+        call UnsignedMultiplyHLBC       ; HL = the pattern's offset
+        push hl
+        call SpriteTablesAny            ; HL = the patterns
+        pop de
+        add hl,de
+        pop bc
+        push hl
+        ld b,c
+        ld c,' '
+        call RepeatedString             ; the room for them
+        pop hl                          ; HL = VRAM
+        ld de,(DAC + 2)                 ; its descriptor: length, address
+        ex de,hl
+        ld b,(hl)
+        inc hl
+        ld a,(hl)
+        inc hl
+        ld h,(hl)
+        ld l,a
+        ex de,hl                        ; DE = the characters
+.byte:
+        call ReadVramBig
+        ld (de),a
+        inc de
+        inc hl
         djnz .byte
         pop hl
         ret

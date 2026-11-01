@@ -1,0 +1,1 @@
+print 1\nq%=usr(0)\nprint "x"\nx=usr5(2)\nrun\n

@@ -20,6 +20,21 @@ ChangeMode:
         ld ix,MainChangeMode            ; 0-3: the main ROM
         jp CallMain
 .new:
+        push hl                         ; the aspect for CIRCLE (GTASPC): 1, SCREEN 6 and 7: 2 and 1/2
+        push de
+        ld hl,$0100
+        ld de,$0100
+        cp $06
+        jr c,.aspect
+        cp $08
+        jr nc,.aspect
+        ld hl,$0200
+        ld de,$0080
+.aspect:
+        ld (ASPCT1),hl
+        ld (ASPCT2),de
+        pop de
+        pop hl
         cp $09
         ret nc
         ld (SCRMOD),a
@@ -80,6 +95,28 @@ ChangeMode:
         jr nz,.name
         djnz .third
 .notGraphic3:
+        ld a,(SCRMOD)                   ; the current screen's tables, as the standard keeps them (in
+        ld hl,$0000                     ; SCREEN 5-8 CGPBAS stays as it was)
+        ld (NAMBAS),hl
+        cp $04
+        jr nz,.bitmapBases
+        ld hl,$1800
+        ld (NAMBAS),hl
+        ld hl,$0000
+        ld (CGPBAS),hl
+        ld hl,$3800
+        ld de,$1E00
+        jr .bases
+.bitmapBases:
+        ld hl,$7800
+        ld de,$7600
+        cp $07
+        jr c,.bases
+        ld hl,$F000
+        ld de,$FA00
+.bases:
+        ld (PATBAS),hl
+        ld (ATRBAS),de
         call ChangeColours
         call ClearSprites
         xor a
@@ -354,3 +391,32 @@ SetPage:
         ld b,a
         ld c,$02
         jp WriteVdpReg
+
+; DelLno / InsLno: DELLNO / INSLNO. In: L = row (from 1): it goes and the rows below move up / a blank row
+; goes in there and the rows below move down (the main ROM's ESC M / ESC L). The cursor stays.
+DelLno:
+        ld a,l
+        ld hl,(CSRY)
+        push hl
+        ld (CSRY),a
+        call RowDelete
+        pop hl
+        ld (CSRY),hl
+        ret
+InsLno:
+        ld a,l
+        ld hl,(CSRY)
+        push hl
+        ld (CSRY),a
+        call InsertLine
+        pop hl
+        ld (CSRY),hl
+        ret
+
+; PutVrm: PUTVRM. In: H = column, L = row (from 1), C = character: it goes to that cell of the text screen.
+PutVrm:
+        push bc
+        call CellAddress
+        pop bc
+        ld a,c
+        jp WriteVram

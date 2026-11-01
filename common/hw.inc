@@ -40,3 +40,5 @@ PsgPortB        equ $0F         ; joystick port select and trigger lines
 
 ; --- Secondary slot selection register (visible in page 3 of an expanded slot) ---
 SecondarySlotReg equ $FFFF
+PrinterStatus   equ $90                 ; printer: read bit 1 = busy; write bit 0 = strobe (0: on)
+PrinterData     equ $91                 ; printer: the byte to print

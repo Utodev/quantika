@@ -1,13 +1,15 @@
 ; crunch.asm: the tokenizer: a typed line (text) into tokens in KBUF. Keywords are found at every letter
 ; (also inside names, as the original BASIC does: TOTAL is TO TAL), the longest first; spaces stay; numbers become
 ; number tokens (FIN reads them), or line numbers (0Eh) after the statements that take them; strings,
-; and the text after REM, ' and DATA, are copied as they are; letters outside them become capitals.
+; and the text after REM, ' and DATA, are copied as they are; letters outside them become capitals. The name
+; after CALL or _ is kept as it is, in capitals (CALL FORMAT: no FOR in it), as the original BASIC does.
 
 CrunchRaw       equ 0                   ; to the end of the line as it is (REM, ')
 CrunchData      equ 1                   ; as it is up to a ':' outside quotes (DATA)
 CrunchLine      equ 2                   ; numbers are line numbers
 CrunchName      equ 3                   ; inside a name: digits are part of it
 CrunchQuote     equ 4                   ; inside quotes in DATA
+CrunchCall      equ 5                   ; the name after CALL or _: its letters as they are (no keywords)
 
 ; Crunch: In: HL = the text (zero ended). Out: KBUF = the tokens and a 0, B = their bytes (with the 0).
 ; Line buffer overflow when they do not fit. Destroys all.
@@ -37,6 +39,32 @@ Crunch:
         ld c,$00                        ; the DATA ends here
         jp .copy
 .notData:
+        bit CrunchCall,c
+        jr z,.notCall
+        cp ' '
+        jr nz,.callNotSpace
+        bit CrunchName,c
+        jr z,.notCall                   ; (the spaces before the name)
+        jr .callEnds
+.callNotSpace:
+        call UpperCase
+        call IsLetter
+        jp nc,.plainLetter
+        cp '0'
+        jr c,.callEnds
+        cp '9' + 1
+        jr c,.callChar                  ; (a digit of the name)
+.callEnds:
+        res CrunchCall,c
+.callChar:
+        ld a,(hl)
+.notCall:
+        cp '_'
+        jr nz,.notUnderscore
+        set CrunchCall,c
+        res CrunchName,c
+        jp .copy
+.notUnderscore:
         cp '"'
         jp z,.string
         cp ' '
@@ -93,6 +121,10 @@ Crunch:
         jr nz,.notDataToken
         set CrunchData,c
 .notDataToken:
+        cp TkCall
+        jr nz,.notCallToken
+        set CrunchCall,c
+.notCallToken:
         jp .emitAfter
 .plainLetter:
         ld a,(hl)
@@ -365,68 +397,89 @@ Crunch:
         ld a,b
         jr .wordToken
 
-; MatchKeyword: the keyword that starts at HL (A = its first letter, a capital).
+; MatchKeyword: the keyword that starts at HL (A = its first letter, a capital), the longest one of its
+; letter's block in the standard's table (basic/kwtable.asm: there LOC comes before LOCATE).
 ; Out: carry when there is none; else A = token, B bit 7 = a function (FFh before it), HL past it.
 ; Destroys DE (keeps C).
 MatchKeyword:
+        push bc
+        push ix
         push hl
         sub 'A'
         add a,a
         ld e,a
         ld d,$00
-        ld hl,KeywordIndex
+        ld hl,StdKeywordIndex
         add hl,de
         ld e,(hl)
         inc hl
-        ld d,(hl)                       ; DE = the list of this letter
+        ld d,(hl)                       ; DE = the block of this letter
         pop hl
+        ld ix,$0000                     ; IXh = the letters after the first of the longest, IXl = its token
 .entry:
         ld a,(de)
         or a
-        scf
-        ret z                           ; none
+        jr z,.done
         push hl
-        push de
-        and $7F
-        ld b,a                          ; B = letters to compare after the first
-        inc de
-        inc hl
+        inc hl                          ; (the first letter is the block's)
+        ld b,$00                        ; B = letters matched
 .letter:
-        ld a,b
-        or a
-        jr z,.matched
         ld a,(hl)
         call UpperCase
-        ex de,hl
-        cp (hl)
-        ex de,hl
-        jr nz,.differ
-        inc hl
-        inc de
-        dec b
-        jr .letter
-.matched:
-        ld a,(de)                       ; the token
-        pop de                          ; the entry: its function bit
-        push af
-        ld a,(de)
-        and $80
-        ld b,a
-        pop af
-        pop de                          ; (the text before the word: not needed)
-        or a
-        ret
-.differ:
-        pop de
-        pop hl
+        ld c,a
         ld a,(de)
         and $7F
-        add a,$02                       ; the length byte, the letters, the token
-        add a,e
-        ld e,a
-        jr nc,.entry
-        inc d
+        cp c
+        jr nz,.differ
+        inc b
+        inc hl
+        ld a,(de)
+        inc de
+        rla                             ; bit 7: the last one
+        jr nc,.letter
+        ld a,ixh                        ; the whole word: the longest so far?
+        cp b
+        jr nc,.shorter
+        ld ixh,b
+        ld a,(de)
+        ld ixl,a
+.shorter:
+        inc de                          ; past the token
+        pop hl
         jr .entry
+.differ:
+        ld a,(de)                       ; past the rest of this one and its token
+        inc de
+        rla
+        jr nc,.differ
+        inc de
+        pop hl
+        jr .entry
+.done:
+        ld a,ixh
+        or a
+        jr z,.none
+        inc hl                          ; HL past the word
+        ld e,a
+        ld d,$00
+        add hl,de
+        ld a,ixl                        ; the token: below 80h a function's (FFh, 80h + it)
+        ld d,$00
+        cp $80
+        jr nc,.statement
+        or $80
+        ld d,$80
+.statement:
+        pop ix
+        pop bc
+        ld b,d
+        or a
+        ret
+.none:
+        pop ix
+        pop bc
+        scf
+        ret
 
 ; UpperCase: A in capitals when it is a small letter.
 UpperCase:

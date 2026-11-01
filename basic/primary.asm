@@ -76,6 +76,8 @@ TokenOperands:                          ; tokens that are operands
         db TkPoint : dw OperandPoint
         db TkPlay : dw OperandPlay
         db TkInput : dw OperandInput
+        db TkDskiStr : dw FuncDski       ; (DSKI$: the disk's)
+        db TkSprite : dw OperandSprite
         db 0
 
 OperandMinus:                           ; (a sign where EvalUnary did not look: 2^-1 went there)
@@ -323,8 +325,8 @@ FunctionTable:
         dw FuncLeft, FuncRight, FuncMid, FuncSgn, FuncInt, FuncAbs, FuncSqr, FuncRnd, FuncSin, FuncLog, FuncExp, FuncCos
         dw FuncTan, FuncAtn, FuncFre, FuncInp, FuncPos, FuncLen, FuncStr, FuncVal, FuncAsc, FuncChr, FuncPeek, FuncVpeek
         dw FuncSpace, FuncOct, FuncHex, FuncLpos, FuncBin, FuncCint, FuncCsng, FuncCdbl, FuncFix, FuncStick, FuncStrig
-        dw FuncPdl, FuncPad, FuncDisk, FuncDisk, FuncDisk, FuncDisk, FuncDisk, FuncEof, FuncDisk, FuncDisk, FuncDisk
-        dw FuncDisk, FuncDisk
+        dw FuncPdl, FuncPad, FuncDskf, FuncFpos, FuncCvi, FuncCvs, FuncCvd, FuncEof, FuncLoc, FuncLof
+        dw FuncMki, FuncMks, FuncMkd
 
 ; Numbers of a number: the argument in brackets, then a routine on DAC (HL kept around it).
 FuncSgn:
@@ -893,7 +895,26 @@ FuncVpeek:
         ex de,hl
         call ReadVramBig
         pop hl
+        call VramBankZero
         jr ByteResult
+
+; VramBankZero: after VPEEK / VPOKE (64K addresses: R#14 set), R#14 at 0 again in SCREEN 0-4, whose VRAM
+; accesses take only 14 bits (as the original: the text goes on where it was). Keeps all but the flags.
+VramBankZero:
+        push af
+        ld a,(SCRMOD)
+        cp $05
+        jr nc,.done
+        xor a
+        ld (RG14SAV),a
+        di
+        out (VdpCommand),a
+        ld a,$8E
+        out (VdpCommand),a
+        ei
+.done:
+        pop af
+        ret
 FuncInp:
         call ParenAddress
         ld c,e
@@ -924,19 +945,31 @@ FuncFre:
         ld hl,(FRETOP)
         ld de,(STKTOP)
         jr .difference
-.memory:                                ; (from the stack as this statement found it, less 14 bytes: the
-        ld hl,(SAVSTK)                  ; original's count, which a GOSUB or FOR frame lowers too; 4
-        ld de,14                        ; more while a program runs)
+.memory:                                ; (from the stack as this statement found it (a GOSUB or FOR frame
+        ld hl,0                         ; lowers it), less 14 bytes and less what the original's evaluation
+        add hl,sp                       ; has on the stack here: learned as a black box, it is what this
+        ex de,hl                        ; one has over PRINT's (PRINT and IF the same), times 2/3 (LET 4,
+        ld hl,(SAVSTK)                  ; a bracket 6, an operator waiting 10 there)
+        or a
+        sbc hl,de                       ; HL = this evaluation's bytes on the stack (12 under PRINT)
+        ld de,-12
+        add hl,de
+        jr c,.over
+        ld hl,0
+.over:
+        add hl,hl
+        inc hl
+        inc hl                          ; 2 * (bytes - 12) + 2
+        ld de,3
+        ld bc,14 - 1
+.third:
+        inc bc                          ; BC = 14 + that / 3
         or a
         sbc hl,de
-        ld de,(CURLIN)
-        ld a,d
-        and e
-        inc a
-        jr z,.direct
-        ld de,4
-        sbc hl,de
-.direct:
+        jr nc,.third
+        ld hl,(SAVSTK)
+        or a
+        sbc hl,bc
         ld de,(STREND)
 .difference:
         or a
@@ -967,7 +1000,7 @@ FuncStick:
         ld a,e
         call GetStick
         pop hl
-        jr ByteResult
+        jp ByteResult
 FuncStrig:
         call ParenInteger
         push hl
@@ -992,9 +1025,63 @@ FuncPad:
         pop hl
         jp ByteResult
 
-; FuncDisk: the disk functions come from a disk ROM (its hooks); without one: Syntax error.
-FuncDisk:
-        jp SyntaxError
+; The disk functions come from a disk ROM (their hooks, common/diskapi.inc); without one (as the original):
+; DSKF, DSKI$, CVI, CVS, CVD, MKI$, MKS$, MKD$ Illegal function call; LOC and LOF File not OPEN for a closed
+; file (else Illegal function call); FPOS Internal error.
+FuncDskf:        ld c,FnDskf : ld ix,H_DSKF : jp DiskStatement
+FuncDski:        ld c,TkDskiStr : ld ix,H_DSKI : jp DiskStatement
+FuncCvi:         ld c,FnCvi : ld ix,H_CVI : jp DiskStatement
+FuncCvs:         ld c,FnCvs : ld ix,H_CVS : jp DiskStatement
+FuncCvd:         ld c,FnCvd : ld ix,H_CVD : jp DiskStatement
+FuncMki:         ld c,FnMkiStr : ld ix,H_MKIS : jp DiskStatement
+FuncMks:         ld c,FnMksStr : ld ix,H_MKSS : jp DiskStatement
+FuncMkd:         ld c,FnMkdStr : ld ix,H_MKDS : jp DiskStatement
+FuncFpos:
+        ld c,FnFpos
+        ld ix,H_FPOS
+        call DiskHook
+        ret nc
+        ld e,ErrInternal
+        jp RaiseError
+FuncLoc:         ld ix,H_LOC : jr FuncLocLof
+FuncLof:         ld ix,H_LOF
+; FuncLocLof: LOC(n) / LOF(n) (IX = the hook): a disk ROM answers for its files (the hook gets DE = the
+; file's block); File not OPEN for a closed file, Illegal function call for the other devices.
+FuncLocLof:
+        call ParenInteger
+        push hl
+        ld a,e
+        call FileBlockMain
+        ld a,(hl)
+        ex de,hl
+        pop hl
+        or a
+        jr z,.notOpen
+        call DiskHook
+        ret nc
+        jp IllegalFunction
+.notOpen:
+        ld e,ErrFileNotOpen
+        jp RaiseError
+; FileBlockMain: HL = file A's control block (FILTAB); Bad file number past MAXFILES.
+FileBlockMain:
+        ld hl,MAXFIL
+        cp (hl)
+        jr z,.ok
+        jr c,.ok
+        ld e,ErrBadFileNumber
+        jp RaiseError
+.ok:
+        add a,a
+        ld e,a
+        ld d,$00
+        ld hl,(FILTAB)
+        add hl,de
+        ld e,(hl)
+        inc hl
+        ld d,(hl)
+        ex de,hl
+        ret
 
 ; OperandErl / OperandErr / OperandTime.
 OperandErl:

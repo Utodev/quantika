@@ -21,7 +21,7 @@ FileSpec:
         ex de,hl                        ; HL = the characters
         ld a,b
         cp $04                          ; "CAS:" in front?
-        jr c,.name
+        jr c,.other
         push hl
         push bc
         ld de,CasDevice
@@ -45,6 +45,7 @@ FileSpec:
 .notCas:
         pop bc
         pop hl
+.other:
         push hl                         ; another device ("X:" in the first characters): not here
         push bc
         ld a,b
@@ -344,8 +345,12 @@ CasStoppedOut:
 
 ; --- BLOAD / BSAVE ---
 
-; StatementBload: BLOAD "name" [, R] [, offset].
+; StatementBload: BLOAD "name" [, R] [, offset]. (A disk's file: the disk ROM, through H_BINL.)
 StatementBload:
+        ld c,TkBload
+        ld ix,H_BINL
+        call DiskHook
+        ret nc
         call FileSpec
         ld de,$0000
         ld (TEMP2),de                   ; offset
@@ -445,8 +450,12 @@ ReadTapeWord:
         ld d,a
         ret
 
-; StatementBsave: BSAVE "name", start, end [, run address].
+; StatementBsave: BSAVE "name", start, end [, run address]. (A disk's file: the disk ROM, through H_BINS.)
 StatementBsave:
+        ld c,TkBsave
+        ld ix,H_BINS
+        call DiskHook
+        ret nc
         call FileSpec
         call Comma
         call EvalAddress
@@ -506,12 +515,17 @@ StatementBsave:
 
 ; --- LOAD / RUN "file" / MERGE (ASCII) and SAVE ---
 
-; StatementLoad: LOAD "name" [, R]. StatementMerge: MERGE "name" (the program in memory stays).
+; StatementLoad: LOAD "name" [, R]. StatementMerge: MERGE "name" (the program in memory stays). (A disk's
+; file: the disk ROM, through H_MERG, C = the statement's token; RUN "name" too.)
 StatementMerge:
+        ld c,TkMerge
+        call LoadHook
         call FileSpec
         xor a
         jr LoadAscii.keep
 StatementLoad:
+        ld c,TkLoad
+        call LoadHook
         call FileSpec
         ld a,$01                        ; bit 0: new program
         push af
@@ -577,7 +591,9 @@ LoadAscii:
         ld a,(LoadFlags)
         and $02
         jp z,Ready
-        ld hl,(TXTTAB)                  ; ,R: RUN
+; RunLoaded: RUN the program in memory (after LOAD "name", R).
+RunLoaded:
+        ld hl,(TXTTAB)
         dec hl
         ld sp,(STKTOP)
         call ClearVariables
@@ -634,12 +650,28 @@ LoadFlags       equ SWPTMP + 4          ; bit 0: a new program, bit 1: RUN after
 
 ; RunFile: RUN "name": LOAD "name", R.
 RunFile:
+        ld c,TkRun
+        call LoadHook
         call FileSpec
         ld a,$03
         jp LoadAscii.keep
 
-; StatementSave: SAVE "name": the program as text (an ASCII file) in blocks of 256 bytes.
+; LoadHook: H_MERG (LOAD, MERGE, RUN "name": C = the token) for a disk ROM; back here when it is not a
+; disk's file.
+LoadHook:
+        ld ix,H_MERG
+        call DiskHook
+        ret c
+        pop af                          ; (taken: the statement is over)
+        ret
+
+; StatementSave: SAVE "name": the program as text (an ASCII file) in blocks of 256 bytes. (A disk's file:
+; the disk ROM, through H_SAVE.)
 StatementSave:
+        ld c,TkSave
+        ld ix,H_SAVE
+        call DiskHook
+        ret nc
         call FileSpec
         push hl
         ld a,CasTypeAscii
@@ -686,10 +718,13 @@ TapeBufferChar:
         pop af
         ret
 
-; FlushTapeBuffer: the 256-byte block to the tape.
+; FlushTapeBuffer: the 256-byte block to the tape (or to a disk's file: H_SAVD, while the disk ROM saves a
+; program as text, takes it and clears the carry).
 FlushTapeBuffer:
         ld hl,(LoadBlock)
-        call WriteTapeBlock
+        scf
+        call H_SAVD
+        call c,WriteTapeBlock
         ld hl,(LoadBlock)
         ld (LoadPointer),hl
         ret

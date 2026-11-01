@@ -146,8 +146,10 @@ NewProgram:
         ld (OLDTXT),a
         ld (OLDTXT + 1),a
         ld (TRCFLG),a
-; ClearVariables: no variables, arrays or strings, DATA from the start, no ON ERROR, the default types.
+; ClearVariables: every file closed, no variables, arrays or strings, DATA from the start, no ON ERROR, the
+; default types.
 ClearVariables:
+        call CloseAllFiles
         push hl
         ld hl,(VARTAB)
         ld (ARYTAB),hl
@@ -188,6 +190,7 @@ ClearVariables:
 ; StatementClear: CLEAR [string space [, highest address]].
 StatementClear:
         jr z,.plain
+        call CloseAllFiles              ; (before the file blocks are laid out again)
         call EvalAddress                ; the string space
         push de
         call ThisChar

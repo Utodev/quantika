@@ -50,17 +50,17 @@ StatementTable:
         dw StatementDefDbl        ; DEFDBL
         dw StatementLine          ; LINE
         dw StatementOpen          ; OPEN
-        dw StatementNotYet        ; FIELD
-        dw StatementNotYet        ; GET
+        dw StatementField         ; FIELD
+        dw StatementGet           ; GET (DATE, TIME; the disk's: an error)
         dw StatementPut           ; PUT
         dw StatementClose         ; CLOSE
         dw StatementLoad          ; LOAD
         dw StatementMerge         ; MERGE
-        dw StatementNotYet        ; FILES
-        dw StatementNotYet        ; LSET
-        dw StatementNotYet        ; RSET
+        dw StatementFiles         ; FILES
+        dw StatementLset          ; LSET
+        dw StatementRset          ; RSET
         dw StatementSave          ; SAVE
-        dw StatementNotYet        ; LFILES
+        dw StatementLfiles        ; LFILES
         dw StatementCircle        ; CIRCLE
         dw StatementColor         ; COLOR
         dw StatementDraw          ; DRAW
@@ -82,14 +82,38 @@ StatementTable:
         dw StatementMotor         ; MOTOR
         dw StatementBload         ; BLOAD
         dw StatementBsave         ; BSAVE
-        dw StatementNotYet        ; DSKO$
+        dw StatementDsko          ; DSKO$
         dw StatementSet           ; SET
-        dw StatementNotYet        ; NAME
-        dw StatementNotYet        ; KILL
-        dw StatementNotYet        ; IPL
+        dw StatementName          ; NAME
+        dw StatementKill          ; KILL
+        dw StatementIpl           ; IPL
         dw StatementCopy          ; COPY
-        dw StatementNotYet        ; CMD
+        dw StatementCmd           ; CMD
         dw StatementLocate        ; LOCATE
 
-StatementNotYet:
-        jp SyntaxError
+; The disk's statements (FIELD, FILES, LSET, RSET, LFILES, DSKO$, NAME, KILL, IPL, CMD): a disk ROM takes
+; them through their hooks (common/diskapi.inc); without one, Illegal function call (as the original).
+StatementField:  ld c,TkField : ld ix,H_FIEL : jr DiskStatement
+StatementFiles:  ld c,TkFiles : ld ix,H_FILE : jr DiskStatement
+StatementLfiles: ld c,TkLfiles : ld ix,H_FILE : jr DiskStatement
+StatementLset:   ld c,TkLset : ld ix,H_LSET : jr DiskStatement
+StatementRset:   ld c,TkRset : ld ix,H_RSET : jr DiskStatement
+StatementDsko:   ld c,TkDskoStr : ld ix,H_DSKO : jr DiskStatement
+StatementName:   ld c,TkName : ld ix,H_NAME : jr DiskStatement
+StatementKill:   ld c,TkKill : ld ix,H_KILL : jr DiskStatement
+StatementIpl:    ld c,TkIpl : ld ix,H_IPL : jr DiskStatement
+StatementCmd:    ld c,TkCmd : ld ix,H_CMD
+; DiskStatement: (also the disk's functions) calls the hook IX with carry set, C = the token; carry still
+; set when it comes back: no disk ROM took it, Illegal function call.
+DiskStatement:
+        call DiskHook
+        ret nc
+        jp IllegalFunction
+; DiskHook: the hook IX with carry set (A, C, HL as the caller left them). Out: the hook's carry and HL.
+DiskHook:
+        scf
+        jp (ix)
+; FileHook: the same with the hook IY (the sub-ROM's file code calls it through CallMain, which takes IX).
+FileHook:
+        scf
+        jp (iy)

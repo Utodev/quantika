@@ -278,8 +278,8 @@ CallBasic:
 ; CallSubRomDirect: EXTROM. Call IX in the sub-ROM. Preserves IY.
 CallSubRomDirect:
         push iy
-        ld iy,(EXBRSA - 1)              ; IYh = EXBRSA = the sub-ROM's slot
-        call CallSlot
+        ld iy,(SUBSLT - 1)              ; IYh = SUBSLT = the sub-ROM's slot (EXBRSA's copy: tape programs
+        call CallSlot                   ; loaded over the work area overwrite EXBRSA itself)
         pop iy
         ret
 

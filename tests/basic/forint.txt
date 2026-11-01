@@ -1,0 +1,1 @@
+10 for i%=0 to 5:print i%;:next i%:print\n20 for i%=5 to 0 step -2:print i%;:next:print\n30 for i%=3 to 1:print i%;:next:print "x"\n40 fori%=0to5:readq%:poke&hef00+i%,q%:nexti%:defusr=&hef00:q%=usr(0)\n50 for i%=0 to 5:print peek(&hef00+i%);:next:print\n60 for i%=32765 to 32767:print i%;:next\n70 data 33,0,0,201,0,201\nrun\n

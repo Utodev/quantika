@@ -2,10 +2,8 @@
 """mktokens.py: builds data/keywords.asm, the keywords of FBASIC with the token numbers of the original BASIC
 (fixed: programs are saved with them), and common/tokens.inc with a name for each token.
 
-The tokenizer looks a word up by its first letter (KeywordIndex: 26 pointers), in a list where the
-longer words come first, so the first match is the longest. Each entry: one byte with the length of
-the rest of the word (bit 7 set for the FFh-prefixed function tokens), the rest of the word, the
-token. A list ends with 0. LIST finds a token's name in StatementNames (tokens 81h-FCh) or
+The tokenizer looks a word up in the standard's keyword table (basic/kwtable.asm, at its fixed
+address). LIST finds a token's name in StatementNames (tokens 81h-FCh) or
 FunctionNames (FFh 81h-B0h): the names one after another, the last letter of each with bit 7 set.
 Run from this project's folder: python3 tools/mktokens.py"""
 import os
@@ -46,18 +44,6 @@ for i, w in enumerate(FUNCTIONS):
     inc.append('Fn%-12s equ $%02X       ; after FFh' % (pretty(w), 0x81 + i))
     words.append((w, 0x81 + i, True))
 inc.append('TkFunction     equ $FF       ; the prefix of the function tokens')
-
-out.append('KeywordIndex:')
-for letter in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ':
-    out.append('        dw Keywords%s' % letter)
-for letter in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ':
-    out.append('Keywords%s:' % letter)
-    group = sorted([x for x in words if x[0][0] == letter], key=lambda x: -len(x[0]))
-    for w, t, fn in group:
-        rest = w[1:]
-        out.append('        db $%02X%s : db $%02X   ; %s' % (len(rest) | (0x80 if fn else 0),
-                   (' : db "%s"' % rest) if rest else '', t, w))
-    out.append('        db 0')
 
 def names(label, lst):
     res = [label + ':']

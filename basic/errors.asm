@@ -14,12 +14,8 @@ RaiseError:
         ld (OLDTXT),a
         ld (OLDTXT + 1),a
         call H_ERRO                     ; (E = the code: the disk ROM and others look at errors here)
-        ld hl,(CURLIN)
-        ld a,h
-        and l
-        inc a
-        jr z,.message                   ; direct mode
-        ld hl,(ONELIN)
+        ld hl,(ONELIN)                  ; (in direct mode too, as the original: an ON ERROR left set by the
+                                        ; program takes the errors of the lines typed after it)
         ld a,h
         or l
         jr z,.message                   ; no ON ERROR

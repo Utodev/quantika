@@ -11,6 +11,7 @@
         include "subrom.inc"
         include "mathpack.inc"
         include "tokens.inc"
+        include "diskapi.inc"
         include "buildstamp.inc"        ; (written by build.sh: BUILD_STAMP)
         include "errors.inc"
         include "fbasicsub.inc"
@@ -27,7 +28,9 @@
         include "bios/screen.asm"
         include "bios/cassette.asm"
         include "bios/editor.asm"
-        include "bios/stubs.asm"
+        include "bios/pixel.asm"
+        include "bios/queue.asm"
+        include "bios/devices.asm"
 FixedCodeEnd:
         assert FixedCodeEnd <= FontAddress, "the BIOS code runs into the font"
 
@@ -43,8 +46,16 @@ FontAndKeysEnd:
 ; --- the Math-Pack at its fixed addresses, its code after it ---
         include "basic/mathpack.asm"
         include "basic/compat.asm"
+        include "basic/kwtable.asm"
 
 ; --- the modules that can go anywhere: tools/pack.py places them (layout_main.txt) ---
         include "out/layout_main.inc"
+
+; --- the header of the disk ROM's service table (common/diskapi.inc) at its fixed place ---
+        org DiskServices
+        db "FBDISK"
+        db SrvEntries
+        db 0
+        dw DiskServiceTable
 
         savebin "out/main_free.rom", $0000, $8000

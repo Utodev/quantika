@@ -85,7 +85,7 @@ Bios_CHSNS:     jp KeyAvailable         ; 009C
 Bios_CHGET:     jp GetKey               ; 009F
 Bios_CHPUT:     jp PutChar              ; 00A2
 Bios_LPTOUT:    jp PrinterOut           ; 00A5
-Bios_LPTSTT:    jp PrinterStatus        ; 00A8
+Bios_LPTSTT:    jp PrinterStatusTest    ; 00A8
 Bios_CNVCHR:    jp ConvertGraphicChar   ; 00AB
 Bios_PINLIN:    jp InputLine            ; 00AE
 Bios_INLIN:     jp InputLineAtCursor    ; 00B1

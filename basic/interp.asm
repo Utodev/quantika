@@ -773,16 +773,16 @@ StatementNext:
         push hl
         ld l,(ix+6)                     ; the step (an integer at bytes 2-3 of its 8)
         ld h,(ix+7)
-        add hl,de
-        jp pe,Overflow                  ; (signed overflow)
+        or a
+        adc hl,de                       ; (adc: add hl does not tell a signed overflow)
+        jp pe,Overflow
         ex de,hl
         pop hl
         ld (hl),d
         dec hl
         ld (hl),e
         ld l,(ix+14)                    ; the limit
-        ld h,(ix+15)
-        ex de,hl                        ; DE = variable, HL = limit
+        ld h,(ix+15)                    ; DE = variable, HL = limit
         call CompareIntegers            ; A: 1 below, 0 equal, FFh above
         jr .compared
 .real:

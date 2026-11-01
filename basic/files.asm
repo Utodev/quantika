@@ -7,8 +7,13 @@
 ; As the original lays them out: MAXFILES + 1 file control blocks (file 0 is BASIC's own) of 265 bytes
 ; just under HIMEM, FILTAB (a table of their addresses) under them, MEMSIZ two bytes under FILTAB, and
 ; NULBUF = file 0's buffer. A block: +0 the mode (0 closed, 1 input, 2 output, 4 random: OPEN without
-; FOR, 8 append), +4 the device (FFh CAS:, FDh CRT:, FEh LPT:, FCh GRP:), +6 the column printed to, +7 and
-; +8 the cassette's place in the buffer and whether it holds a block, +9 the buffer (a block of the tape).
+; FOR, 8 append), +4 the device (FFh CAS:, FDh CRT:, FEh LPT:, FCh GRP:, under FCh a disk ROM's file),
+; +6 the column printed to, +7 and +8 the place in the buffer and whether it holds a block (read), +9 the
+; buffer (a block of the tape, 256 bytes of a disk file, a disk file's record).
+;
+; A disk ROM's files (common/diskapi.inc): a name that is no device here goes to H_PARD, which gives the
+; device; then the disk ROM opens it (H_NULO), fills the buffer when it is read (H_INDS), takes it when it
+; is full (H_FILO) and closes the file (H_NTFL); the buffer is used as the cassette's (1Ah at the end).
 
 FileMode        equ 0                   ; (offsets in a file control block; FileColumn: fbasicsub.inc)
 FileDevice      equ 4
@@ -139,6 +144,18 @@ FileForOutput:
         ld e,ErrBadFileNumber           ; (being read)
         jp RaiseError
 .writable:
+        cp $04                          ; (a disk ROM's random file: Bad file mode)
+        jr nz,.output
+        push hl
+        ld hl,FileDevice
+        add hl,de
+        ld a,(hl)
+        pop hl
+        cp DeviceGrp
+        jr nc,.output
+        ld e,ErrBadFileMode
+        jp RaiseError
+.output:
         ld (PTRFIL),de
         call ThisChar
         cp ','
@@ -218,20 +235,37 @@ StatementOpen:
         ld e,ErrFileAlreadyOpen
         jp RaiseError
 .free:
+        push hl                         ; (+1 - +3: 0)
+        ld h,d
+        ld l,e
+        inc hl
+        xor a
+        ld (hl),a
+        inc hl
+        ld (hl),a
+        inc hl
+        ld (hl),a
+        pop hl
         ld a,c
+        cp DeviceGrp
+        jr c,.disk
         cp DeviceCas
         ld a,b
         jr nz,.writer
         cp $04                          ; the cassette: FOR INPUT or FOR OUTPUT
         jr nc,.badName
-        jr .length
+        jr .opened
 .writer:
         cp $01                          ; the screens and the printer only write
         jr z,.badName
         cp $08
         jr z,.badName
-.length:
-        call ThisChar                   ; LEN = size (read: no use without a disk)
+        jr .opened
+.disk:
+        ld a,b                          ; LEN = size (1 - 256; only without FOR): at +1, +2
+        cp $04
+        jr nz,.opened
+        call ThisChar
         cp TkFunction
         jr nz,.opened
         inc hl
@@ -243,34 +277,53 @@ StatementOpen:
         db TkEqual
         push bc
         push de
-        call EvalByte
-        pop de
+        call EvalInteger
+        ld a,d
+        or e
+        jp z,IllegalFunction
+        dec de
+        inc d
+        dec d
+        jp nz,IllegalFunction
+        inc de
+        ex (sp),hl
+        inc hl
+        ld (hl),e
+        inc hl
+        ld (hl),d
+        dec hl
+        dec hl
+        ex de,hl
+        pop hl
         pop bc
 .opened:
+        call AtStatementEnd             ; (nothing more: checked before the file is opened)
+        jp nz,SyntaxError
+        push hl
+        ld hl,FileDevice
+        add hl,de
+        ld (hl),c                       ; the device
+        inc hl
+        xor a
+        ld (hl),a
+        inc hl
+        ld (hl),a                       ; the column
+        inc hl
+        ld (hl),a                       ; the place in the buffer
+        inc hl
+        ld (hl),a                       ; no block in it
+        pop hl
         ld a,c
         cp DeviceCas
         call z,CasOpen
-        ld a,b
-        ld (de),a                       ; the mode
-        inc de
-        xor a
-        ld (de),a
-        inc de
-        ld (de),a
-        inc de
-        ld (de),a
-        inc de
         ld a,c
-        ld (de),a                       ; the device
-        inc de
-        xor a
-        ld (de),a
-        inc de
-        ld (de),a                       ; the column
-        inc de
-        ld (de),a                       ; the place in the buffer
-        inc de
-        ld (de),a                       ; no block in it
+        cp DeviceGrp
+        jr nc,.mode
+        ld iy,H_NULO                    ; a disk ROM's file (DE = the block, B = the mode)
+        call FileHook
+.mode:
+        ld a,b
+        ld (de),a                       ; the mode: open
         ret
 .badName:
         ld e,ErrBadFileName
@@ -298,16 +351,19 @@ CasOpen:
         ret
 
 ; FileDeviceOf: the device of the file name at DE (B characters): CAS:, CRT:, LPT:, GRP: (in any case;
-; a name after them does not matter here). Out: A. Bad file name for anything else.
+; a name after them does not matter here), else a disk ROM's file (H_PARD gives its device). Out: A. Bad
+; file name for anything else.
 FileDeviceOf:
+        push de
+        push bc
         ld a,b
         cp 4
-        jr c,.bad
+        jr c,.other
         ld hl,DeviceNames
 .device:
         ld a,(hl)
         or a
-        jr z,.bad
+        jr z,.other
         push de
         push hl
         ld b,4
@@ -322,6 +378,8 @@ FileDeviceOf:
         ld a,(hl)                       ; the device's code
         pop hl
         pop de
+        pop bc
+        pop de
         ret
 .next:
         pop hl
@@ -329,7 +387,12 @@ FileDeviceOf:
         ld bc,5
         add hl,bc
         jr .device
-.bad:
+.other:
+        pop bc
+        pop de
+        ld iy,H_PARD                    ; (DE = the name, B its length: A = the device, carry clear)
+        call FileHook
+        ret nc
         ld e,ErrBadFileName
         jp RaiseError
 DeviceNames:
@@ -370,21 +433,33 @@ CloseAllFiles:
         pop hl
         ret
 
-; CloseFile: the file of block DE closed (closed first: a tape error leaves it so). A CAS: file being
-; written ends with 1Ah, its last block filled with it. Keeps HL, DE.
+; CloseFile: the file of block DE closed (closed first: an error leaves it so). A CAS: file being
+; written ends with 1Ah, its last block filled with it; a disk ROM's file goes to H_NTFL (A = the mode it
+; had). Keeps HL, DE.
 CloseFile:
         ld a,(de)
         push af
         xor a
         ld (de),a
         pop af
-        cp $02
-        ret nz
+        or a
+        ret z
         push hl
+        ld c,a
         ld hl,FileDevice
         add hl,de
         ld a,(hl)
+        cp DeviceGrp
+        jr nc,.notDisk
+        ld a,c
+        ld iy,H_NTFL
+        call FileHook
+        jr .done
+.notDisk:
         cp DeviceCas
+        jr nz,.done
+        ld a,c
+        cp $02
         jr nz,.done
         ld a,$1A
 .pad:
@@ -413,6 +488,7 @@ StatementMaxfiles:
         ld b,a
         call AtStatementEnd
         jp nz,SyntaxError
+        call CloseAllFiles
         push hl
         ld hl,(MEMSIZ)                  ; (the string space keeps its size)
         ld de,(STKTOP)
@@ -424,6 +500,26 @@ StatementMaxfiles:
         call ClearVariables
         pop hl
         ld sp,(STKTOP)                  ; the stack starts again
+        push hl                         ; the blocks zeros (as the original: a random file's buffer has
+        ld hl,(FILTAB)                  ; them where no FIELD has put anything; not before: the old stack
+        ld a,(MAXFIL)                   ; may be there)
+        inc a
+        ld b,a
+        add a,a
+        ld e,a
+        ld d,$00
+        add hl,de
+.zero:
+        ld de,FileBlockSize
+.byte:
+        ld (hl),$00
+        inc hl
+        dec de
+        ld a,d
+        or e
+        jr nz,.byte
+        djnz .zero
+        pop hl
         jp NewStatement
 
 ; FileOutputChar: OUTDO with PTRFIL set: A to the file's device. Keeps every register.
@@ -444,6 +540,10 @@ FileOutputChar:
         ld de,FileDevice
         add hl,de
         ld b,a
+        ld a,(hl)
+        cp DeviceGrp
+        ld a,b
+        jr c,.cassette                  ; (a disk ROM's file: the same buffer)
         ld a,(hl)
         cp DeviceCas
         ld a,b
@@ -624,11 +724,36 @@ CasPutChar:
         push de
         ld hl,FileBuffer
         add hl,de
-        call WriteTapeBlock
+        call WriteFileBuffer
         pop de
         ret
 
-; --- reading (only a CAS: file can be read) ---
+; WriteFileBuffer: the full buffer at HL of block DE to the tape, or to a disk ROM's file (H_FILO).
+WriteFileBuffer:
+        push hl
+        ld hl,FileDevice
+        add hl,de
+        ld a,(hl)
+        pop hl
+        cp DeviceGrp
+        jp nc,WriteTapeBlock
+        ld iy,H_FILO
+        jp FileHook
+
+; ReadFileBuffer: the buffer at HL of block DE filled: the tape's next block, or a disk ROM's file's next
+; 256 bytes (H_INDS: 1Ah after its end).
+ReadFileBuffer:
+        push hl
+        ld hl,FileDevice
+        add hl,de
+        ld a,(hl)
+        pop hl
+        cp DeviceGrp
+        jp nc,ReadTapeBlock
+        ld iy,H_INDS
+        jp FileHook
+
+; --- reading (a CAS: file or a disk ROM's) ---
 
 ; FileToRead: [#] n of a file to read: PTRFIL = its block. A file open for something else: the error E
 ; (GRP: always Illegal function call, as the original).
@@ -648,6 +773,7 @@ FileToRead:
         ld (PTRFIL),de
         ret
 .notInput:
+        ld c,a                          ; (the mode - 1)
         push hl
         ld hl,FileDevice
         add hl,de
@@ -656,6 +782,12 @@ FileToRead:
         ld e,ErrIllegal
         cp DeviceGrp
         jp z,RaiseError
+        jr nc,.error
+        ld a,c                          ; a disk ROM's random file: Bad file mode
+        cp $03
+        ld e,ErrBadFileMode
+        jp z,RaiseError
+.error:
         ld e,b
         jp RaiseError
 
@@ -682,7 +814,7 @@ CasPeek:
         push de
         ld hl,FileBuffer
         add hl,de
-        call ReadTapeBlock
+        call ReadFileBuffer
         pop de
         ld hl,FileLoaded
         add hl,de
@@ -943,6 +1075,11 @@ FuncEof:
         ld hl,FileDevice
         add hl,de
         ld a,(hl)
+        cp DeviceGrp
+        jr nc,.device
+        ld e,ErrBadFileMode             ; (a disk ROM's file being written)
+        jp RaiseError
+.device:
         cp DeviceCas
         jp nz,IllegalFunction
         ld de,$0000

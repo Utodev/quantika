@@ -18,6 +18,7 @@ printf '        define BUILD_STAMP "%s"\n' "$(date +%Y.%m.%d-%H.%M)" > "$OUT/bui
 ROMS=(
   "main_free.rom  main_free.asm  32768  main"
   "sub_free.rom   sub_free.asm   16384  -"
+  "disk_free.rom  disk_free.asm  16384  -"
 )
 for E in "${ROMS[@]}"; do
   read -r NAME SRC SIZE LAYOUT <<<"$E"
@@ -43,7 +44,8 @@ for E in "${ROMS[@]}"; do
 done
 # the machine's name is never in these sources nor in the ROMs (see CLAUDE.md)
 NAME=$(printf '\115\123\130')
-if grep -rIli "$NAME" --exclude-dir=out --exclude-dir=__pycache__ --exclude-dir=.git "$HERE"; then
+# (README.md at the top is the exception: the user's own lines name the machine; see CLAUDE.md)
+if grep -rIli "$NAME" --exclude-dir=out --exclude-dir=__pycache__ --exclude-dir=.git "$HERE" | grep -vx "$HERE/README.md"; then
   echo "ERROR: the files above have the machine's name (see CLAUDE.md)" >&2
   exit 1
 fi

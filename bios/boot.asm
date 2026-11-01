@@ -2,7 +2,10 @@
 ; learn which slots are expanded, fill the work area, set up the chips, find the sub-ROM and start
 ; the ROMs in the slots. If none takes the machine, the banner (FBASIC comes in stage 5).
 
-BootStack       equ $F380               ; the stack grows down from the work area
+BootStack       equ $F1C9               ; the stack grows down from under the disk ROM's work area (F1C9h-F37Fh,
+                                        ; which its INIT fills while the cartridges are scanned); a disk ROM leaves
+                                        ; 128 bytes under it for this stack. (Lower, D000h, broke a game whose
+                                        ; INIT keeps this stack: Donkey Kong.)
 RamTestAddr     equ $E000               ; the byte of page 3 tried for RAM
 ScanHeader      equ BUF                 ; boot only: the 16 bytes of the ROM header being looked at
 ScanSlot        equ BUF + $10           ; boot only: its slot
@@ -144,8 +147,10 @@ ColdStart:
         ei
         call ScanCartridges
         call InitFunctionKeys
-        call InitText40
-        call ShowFunctionKeys
+        ld ix,SubRomScreenFromClock     ; SDFSCR: the settings of SET SCREEN, ADJUST... (the clock's memory)
+        call CallSubRomDirect
+        ld ix,SubRomPrompt              ; PROMPT: the password of SET PASSWORD, if there is one
+        call CallSubRomDirect
         call H_STKE                     ; a ROM that wants to run once BASIC is ready hooks this
         jp BasicColdStart
 
@@ -233,10 +238,11 @@ InitVdp:
         jp SetDefaultPalette
 
 ; FindSlots: CHKSLZ. Look for the sub-ROM (a "CD" header at 0000h of some slot) and keep its slot in
-; EXBRSA (0 when there is none). Destroys all.
+; EXBRSA and in this ROM's own copy SUBSLT (0 when there is none). Destroys all.
 FindSlots:
         xor a
         ld (EXBRSA),a
+        ld (SUBSLT),a
         call FirstSlotOfPrimary
 .nextSlot:
         push af
@@ -252,6 +258,7 @@ FindSlots:
         jr nz,.notThis
         pop af
         ld (EXBRSA),a
+        ld (SUBSLT),a
         ei
         ret
 .notThis:
@@ -364,14 +371,16 @@ CheckRomHeader:
 WorkAreaDefaults:
         dw LINL40 : db 3 : db 37, 29, 37             ; LINL40, LINL32, LINLEN (WIDTH 37, as the original BASIC starts)
         dw CRTCNT : db 2 : db 24, 14                 ; CRTCNT, CLMLST
-        dw TXTNAM : db 10 : dw $0000, $0000, $0800, $0000, $0000        ; SCREEN 0 tables
+        dw TXTNAM : db 10 : dw $0000, $0800, $0800, $0000, $0000        ; SCREEN 0 tables
         dw T32NAM : db 10 : dw $1800, $2000, $0000, $1B00, $3800        ; SCREEN 1
         dw GRPNAM : db 10 : dw $1800, $2000, $0000, $1B00, $3800        ; SCREEN 2
         dw MLTNAM : db 10 : dw $0800, $0000, $0000, $1B00, $3800        ; SCREEN 3
+        dw CGPNT : db 11 : db $00 : dw FontData                         ; the character set: slot, address
+        dw $0000, $0800, $3800, $1B00                                   ; NAMBAS, CGPBAS, PATBAS, ATRBAS
         dw CLIKSW : db 3 : db 1, 1, 1                ; key click on, cursor at row 1, column 1
         dw RG0SAV : db 8 : db $00, $60, $00, $00, $01, $00, $00, $F1
         dw FORCLR : db 3 : db 15, 4, 4               ; white on dark blue, as the original
-        dw HIMEM : db 2 : dw BootStack
+        dw HIMEM : db 2 : dw $F380                    ; (a disk ROM lowers it)
         dw MAXFIL : db 1 : db 1
         dw CS120 : db 15 : db 82, 75, 40, 37, $0F           ; cassette: 1200 baud (bios/cassette.asm)
         db 40, 33, 20, 15, $1F                              ; 2400 baud

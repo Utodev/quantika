@@ -667,8 +667,10 @@ ScrollUp:
         ld l,a
         jp ClearRow
 
-; DeleteLine: ESC M. The cursor's row goes, the rows below move up.
+; DeleteLine: ESC M. The cursor's row goes, the rows below move up. (RowDelete: the same, for the sub-ROM,
+; whose DeleteLine is BASIC's.)
 DeleteLine:
+RowDelete:
         ld a,(CSRY)
         ld c,a
         ld b,a
@@ -779,7 +781,8 @@ ClearScreen:
 
 ; --- function keys ---
 
-; InitFunctionKeys: INIFNK. The ten function key strings to their power-on values.
+; InitFunctionKeys: INIFNK. The ten function key strings to their power-on values: empty in this ROM (the
+; function keys are not shown, so they type nothing until KEY n gives them a string; ON KEY GOSUB still works).
 InitFunctionKeys:
         ld hl,FunctionKeyDefaults
         ld de,FNKSTR
@@ -804,8 +807,7 @@ InitFunctionKeys:
         ret
 
 FunctionKeyDefaults:
-        db "color ",0, "auto ",0, "goto ",0, "list ",0, "run",$0D,0
-        db "screen 0",$0D,0, "cload",$22,0, "cont",$0D,0, "list.",$0D,$1E,$1E,0, $0C,"run",$0D,0
+        db 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 
 ; FunctionKeysIfOn: FNKSB. The status line when it is on.
 FunctionKeysIfOn:

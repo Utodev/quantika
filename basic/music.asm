@@ -1,16 +1,35 @@
 ; music.asm: the part of PLAY that runs in the interrupt; it must be in page 0 (a cartridge may be in
 ; page 1 when the interrupt comes). See play.asm.
 
-; QueueEntry: HL = voice C's QUETAB entry (3 bytes).
+; QueueEntry: HL = voice C's QUETAB entry (6 bytes).
 QueueEntry:
         ld a,c
         add a,a
         add a,c
+        add a,a
         ld hl,QUETAB
         add a,l
         ld l,a
         ret nc
         inc h
+        ret
+
+; FramesLeft: HL = the frames left of voice C's event, in its voice block. Keeps AF, BC, DE.
+FramesLeft:
+        push af
+        push de
+        ld hl,VCBA + VoiceFramesLeft
+        ld de,VCBB - VCBA
+        ld a,c
+.next:
+        or a
+        jr z,.done
+        add hl,de
+        dec a
+        jr .next
+.done:
+        pop de
+        pop af
         ret
 
 ; QueueAddress: IY = voice C's queue + A. Keeps BC.
@@ -46,17 +65,14 @@ PlayMusic:
         ld b,$00                        ; B = voices still busy
         ld c,$00
 .voice:
-        call QueueEntry
-        inc hl
-        inc hl
+        call FramesLeft
         ld a,(hl)                       ; frames left
         or a
         jr z,.next
         dec (hl)
         jr nz,.voiceDone
 .next:
-        dec hl
-        dec hl
+        call QueueEntry
         ld a,(hl)                       ; empty?
         inc hl
         cp (hl)
@@ -70,7 +86,7 @@ PlayMusic:
         add a,4
         and $7F
         ld (hl),a                       ; get moves on
-        inc hl
+        call FramesLeft
         ld a,(iy+3)
         ld (hl),a                       ; its frames
         ld a,c                          ; PSG: period (registers 2C, 2C+1), volume (8 + C)

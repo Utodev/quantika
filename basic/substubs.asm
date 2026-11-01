@@ -1,24 +1,31 @@
 ; substubs.asm: the FBASIC routines that live in the sub-ROM (common/fbasicsub.inc): each one calls
 ; there with EXTROM (AF, BC, DE, HL go and come back: the text pointer and NextChar's flags).
 
+; SubRomCall: EXTROM, the interrupts on again afterwards (the slot call leaves them off; BASIC's traps,
+; ON INTERVAL and the like, need them while a program runs).
+SubRomCall:
+        call CallSubRomDirect
+        ei
+        ret
+
 StatementPset:
         ld ix,SubPset
-        jp CallSubRomDirect
+        jp SubRomCall
 StatementPreset:
         ld ix,SubPreset
-        jp CallSubRomDirect
+        jp SubRomCall
 StatementLineGraphic:
         ld ix,SubLineGraphic
-        jp CallSubRomDirect
+        jp SubRomCall
 StatementCircle:
         ld ix,SubCircle
-        jp CallSubRomDirect
+        jp SubRomCall
 StatementPaint:
         ld ix,SubPaint
-        jp CallSubRomDirect
+        jp SubRomCall
 StatementPut:
         ld ix,SubPut
-        jp CallSubRomDirect
+        jp SubRomCall
 StatementSprite:                        ; (SPRITE ON / OFF / STOP here: basic/traps.asm)
         cp '$'
         jr z,.pattern
@@ -26,64 +33,78 @@ StatementSprite:                        ; (SPRITE ON / OFF / STOP here: basic/tr
         jp TrapState
 .pattern:
         ld ix,SubSprite
-        jp CallSubRomDirect
+        jp SubRomCall
 StatementColorPalette:
         ld ix,SubColorPalette
-        jp CallSubRomDirect
+        jp SubRomCall
 OperandPoint:
         ld ix,SubPoint
-        jp CallSubRomDirect
+        jp SubRomCall
 StatementDraw:
         ld ix,SubDraw
-        jp CallSubRomDirect
+        jp SubRomCall
 PrintUsing:
         ld ix,SubPrintUsing
-        jp CallSubRomDirect
+        jp SubRomCall
 StatementDelete:
         ld ix,SubDelete
-        jp CallSubRomDirect
+        jp SubRomCall
 StatementRenum:
         ld ix,SubRenum
-        jp CallSubRomDirect
+        jp SubRomCall
 StatementSet:
         ld ix,SubSet
-        jp CallSubRomDirect
+        jp SubRomCall
 StatementCopy:
+        ld c,TkCopy                     ; COPY "file" TO "file": the disk ROM's (H_COPY)
+        ld ix,H_COPY
+        call DiskHook
+        ret nc
+        call ThisChar
         ld ix,SubCopy
-        jp CallSubRomDirect
+        jp SubRomCall
 StatementOpen:
         ld ix,SubOpen
-        jp CallSubRomDirect
+        jp SubRomCall
 StatementClose:
         ld ix,SubClose
-        jp CallSubRomDirect
+        jp SubRomCall
 StatementMax:
         ld ix,SubMaxfiles
-        jp CallSubRomDirect
+        jp SubRomCall
 FileLayout:
         ld ix,SubFileLayout
-        jp CallSubRomDirect
+        jp SubRomCall
 CloseAllFiles:
         ld ix,SubCloseAll
-        jp CallSubRomDirect
+        jp SubRomCall
 FileForOutput:
         ld ix,SubFileForOutput
-        jp CallSubRomDirect
+        jp SubRomCall
 FileOutputChar:                         ; (OUTDO: every register kept)
         push ix
         ld ix,SubFileOutputChar
-        call CallSubRomDirect
+        call SubRomCall
         pop ix
         ret
 InputFile:
         ld ix,SubInputFile
-        jp CallSubRomDirect
+        jp SubRomCall
 LineInputFile:
         ld ix,SubLineInputFile
-        jp CallSubRomDirect
+        jp SubRomCall
 InputFileChars:
         ld ix,SubInputFileChars
-        jp CallSubRomDirect
+        jp SubRomCall
 FuncEof:
         ld ix,SubEof
-        jp CallSubRomDirect
+        jp SubRomCall
+StatementGet:
+        ld ix,SubGet
+        jp SubRomCall
+PromptText:
+        ld ix,SubPromptText
+        jp SubRomCall
+OperandSprite:
+        ld ix,SubSpriteFunction
+        jp SubRomCall

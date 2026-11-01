@@ -7,16 +7,18 @@ ScanKeyboard:
         ld bc,$000B
         ldir
         ld hl,NEWKEY
-        xor a
+        in a,(PpiControl)
+        and $F0
+        ld c,a                          ; C = port C with row 0 (its other bits kept)
+        ld b,$0B
 .nextRow:
-        push af
-        call ReadKeyRow
+        ld a,c
+        out (PpiControl),a
+        in a,(PpiKeyRow)
         ld (hl),a
         inc hl
-        pop af
-        inc a
-        cp $0B
-        jr c,.nextRow
+        inc c
+        djnz .nextRow
         ret
 
 ; ReadKeyRow: SNSMAT. In: A = row (0-10). Out: A = its eight keys (bit 0 = pressed). Destroys C.
@@ -128,6 +130,9 @@ ProcessKeys:
         jr nz,.notStopRow
         res 4,b                         ; STOP is done above
 .notStopRow:
+        ld a,b                          ; (most rows have nothing new)
+        or a
+        jr z,.rowDone
         push hl
         push de
         ld e,c
@@ -149,6 +154,7 @@ ProcessKeys:
         jr nz,.bit
         pop de
         pop hl
+.rowDone:
         pop bc
         inc hl
         inc de
@@ -251,7 +257,7 @@ KeyDown:
         or a
         ld a,e
         jr z,PutKeyCode
-        or $20                          ; CAPS: letters change case
+        or $20                          ; CAPS: letters in capitals (with SHIFT too, as the original)
         cp 'a'
         ld a,e
         jr c,PutKeyCode
@@ -259,7 +265,7 @@ KeyDown:
         cp 'z' + 1
         ld a,e
         jr nc,PutKeyCode
-        xor $20
+        and $DF
         jr PutKeyCode
 .layer:
         bit 0,d                         ; GRAPH / CODE with SHIFT: the next table
@@ -428,29 +434,154 @@ CheckCtrlStop:
         or a
         ret
 
-; Beep: BEEP. A short tone on channel A. Destroys all.
+; Beep: BEEP, as SET BEEP chose it (the clock's memory, block 2 register 10: (tone - 1) * 4 + volume - 1;
+; the volume starts at 4, 7, 10 or 15), as the original sounds: tone 1 a short beep, 2 three voices dying
+; away together, 3 two notes and 4 three short ones, each dying away. Destroys all.
 Beep:
-        ld a,$00
-        ld e,$55                        ; about 1.3 kHz
+        ld a,$0D                        ; the setting (block 2), then block 0 again
+        out (RtcIndex),a
+        ld a,$0A
+        out (RtcData),a
+        out (RtcIndex),a
+        in a,(RtcData)
+        ld c,a
+        ld a,$0D
+        out (RtcIndex),a
+        ld a,$08
+        out (RtcData),a
+        ld a,c
+        and $03
+        ld hl,BeepLevels
+        add a,l
+        ld l,a
+        jr nc,.level
+        inc h
+.level:
+        ld d,(hl)                       ; D = the volume to start at
+        ld a,c
+        rrca
+        rrca
+        and $03                         ; the tone - 1
+        jr z,.one
+        dec a
+        jr z,.chorus
+        ld hl,BeepThreeNotes            ; tone 4: three notes of 6 frames
+        ld bc,$0300 + 6 * 4
+        dec a
+        jr nz,.notes
+        ld hl,BeepTwoNotes              ; tone 3: two notes of 18 frames
+        ld bc,$0200 + 18 * 4
+.notes:
+        ld a,PsgMixer
+        ld e,$BE                        ; tone A only
+        call WritePsg
+.note:
+        xor a
+        ld e,(hl)
+        inc hl
+        call WritePsg
+        inc a
+        ld e,$00
+        call WritePsg
+        call BeepDecay
+        djnz .note
+        jr BeepEnd
+.chorus:
+        ld a,PsgMixer                   ; tone 2: three voices a little apart, 18 frames
+        ld e,$B8
+        call WritePsg
+        ld hl,BeepChorus
+        ld b,6
+.voice:
+        ld a,(hl)                       ; register, value
+        inc hl
+        ld e,(hl)
+        inc hl
+        call WritePsg
+        djnz .voice
+        ld c,18 * 4
+        call BeepDecay
+        jr BeepEnd
+.one:
+        xor a                           ; tone 1: a short beep
+        ld e,$55
         call WritePsg
         inc a
         ld e,$00
         call WritePsg
         ld a,PsgMixer
-        call ReadPsg
-        and $FE                         ; tone A on, the rest as it was
-        ld e,a
+        ld e,$BE
+        call WritePsg
+        ld a,$08
+        ld e,d
+        call WritePsg
+        ld a,10
+        call BeepWait
+BeepEnd:
+        ld e,$00                        ; silence, the three tones on as they were left
+        ld a,$08
+        call WritePsg
+        inc a
+        call WritePsg
+        inc a
+        call WritePsg
         ld a,PsgMixer
-        call WritePsg
-        ld a,$08
-        ld e,$0C
-        call WritePsg
-        ld bc,$2C00                     ; about a tenth of a second
-.wait:
-        dec bc
-        ld a,b
-        or c
-        jr nz,.wait
-        ld a,$08
-        ld e,$00
+        ld e,$B8
         jp WritePsg
+BeepLevels:
+        db 4, 7, 10, 15
+BeepTwoNotes:
+        db $2A, $35
+BeepThreeNotes:
+        db $6B, $47, $55
+BeepChorus:                             ; B A7h, C A8h, A A6h
+        db 2, $A7, 3, $00, 4, $A8, 5, $00, 0, $A6, 1, $00
+
+; BeepDecay: the three volumes from D down to 1, the whole fall C quarter frames long. Keeps B, D, HL.
+BeepDecay:
+        push bc
+        push hl
+        ld a,c                          ; each volume: C / D quarter frames
+        ld c,$00
+.divide:
+        inc c
+        sub d
+        jr nc,.divide
+        dec c
+        jr nz,.time
+        inc c
+.time:
+        ld e,d
+.step:
+        ld a,$08
+        call WritePsg
+        inc a
+        call WritePsg
+        inc a
+        call WritePsg
+        ld a,c
+        call BeepWait
+        dec e
+        jr nz,.step
+        pop hl
+        pop bc
+        ret
+
+; BeepWait: about A quarters of a frame (the interrupt's time counted too). Keeps BC, DE, HL.
+BeepWait:
+        push bc
+.quarter:
+        ld c,4
+.loop:
+        ld b,$00
+.inner:
+        djnz .inner
+        dec c
+        jr nz,.loop
+        ld b,96
+.more:
+        djnz .more
+        dec a
+        jr nz,.quarter
+        pop bc
+        ret

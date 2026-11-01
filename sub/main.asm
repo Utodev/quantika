@@ -168,24 +168,10 @@ FillVram:
         pop de
         ret
 
-; GetPattern: GETPAT. A = character: its 8 bytes of the main ROM's character set to PATWRK.
+; GetPattern: GETPAT. A = character: its 8 bytes of the character set CGPNT names to PATWRK (the main
+; ROM's FontPattern).
 GetPattern:
-        ld l,a
-        ld h,$00
-        add hl,hl
-        add hl,hl
-        add hl,hl
-        ld de,MainFont
-        add hl,de
-        ld de,PATWRK
-        ld b,$08
-.byte:
-        call ReadMain
-        ld (de),a
-        inc hl
-        inc de
-        djnz .byte
-        ret
+        jp FontPattern
 
 ; NewPad: NEWPAD. No light pen, mouse or track ball here: 0.
 NewPad:

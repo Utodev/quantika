@@ -1,0 +1,1 @@
+10 cls:on error goto 900\n20 set adjust(3,-4):print vdp(19);:set beep 2,3:set beep ,4:set title "HELLOWORLD",5:gosub 800\n30 set password "AB":gosub 800:set prompt "ABCDEFG":gosub 800:end\n800 for b=2 to 3:out &hb4,13:out &hb5,8+b:for r=0 to 12:out &hb4,r:print hex$(inp(&hb5) and 15);:next:print " ";:next:print:return\n900 print "e";err;erl;:resume next\nrun\nprint 1\n

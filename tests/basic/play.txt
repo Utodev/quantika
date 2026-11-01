@@ -1,1 +1,1 @@
-10 play "t120l8cdefg","o3l4ce"\n20 print play(1);play(2);play(0)\n30 t=time\n40 if play(0) then 40\n50 print "done";int((time-t)/10)\nrun\n
+10 play "t120l8cdefg","o3l4ce"\n20 print play(1);play(2);play(0)\n30 t=time\n40 if play(0) then 40\n50 print "done";int((time-t+5)/10)\nrun\n

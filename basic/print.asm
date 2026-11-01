@@ -78,8 +78,8 @@ StatementPrintItems:
         jr z,.string
         xor a
         call FormatNumber               ; HL = the text
-        push hl                         ; it goes to a new line if it does not fit in this one
-        ld b,$00
+        push hl                         ; it goes to a new line if it does not fit in this one (the
+        ld b,$00                        ; space after it does not count, as the original)
 .length:
         ld a,(hl)
         or a
@@ -88,7 +88,6 @@ StatementPrintItems:
         inc b
         jr .length
 .counted:
-        inc b                           ; (and the space after it)
         call FitsInLine
         pop hl
         call PrintString
@@ -372,7 +371,8 @@ StatementColor:
         pop hl
         ret
 
-; StatementScreen: SCREEN mode (0-8) (the other arguments: stage 8).
+; StatementScreen: SCREEN [mode 0-8] [, sprite size] [, key click] [, cassette 1 (1200 baud) or 2 (2400)]
+; [, printer (0: one of the standard, NTSTDP)] [, interlace 0-3 (R#9's bit 3 IL, bit 2 EO)].
 StatementScreen:
         call ThisChar
         cp ','
@@ -413,7 +413,55 @@ StatementScreen:
         call EvalByte                   ; key click
         ld (CLIKSW),a
 .skipClick:
-        jp SkipToStatementEnd           ; (baud, printer, interlace: later)
+        call ThisChar
+        cp ','
+        ret nz
+        rst $10
+        cp ','
+        jr z,.skipBaud
+        call EvalByte                   ; the cassette's speed: 1 or 2
+        dec a
+        cp $02
+        jp nc,IllegalFunction
+        inc a
+        push hl
+        call SelectBaud
+        pop hl
+.skipBaud:
+        call ThisChar
+        cp ','
+        ret nz
+        rst $10
+        cp ','
+        jr z,.skipPrinter
+        call EvalByte                   ; the printer
+        ld (NTSTDP),a
+.skipPrinter:
+        call ThisChar
+        cp ','
+        ret nz
+        rst $10
+        call EvalByte                   ; the interlace (0-3): bit 0 to IL (bit 3), bit 1 to EO (bit 2)
+        cp $04
+        jp nc,IllegalFunction
+        ld e,$00
+        bit 0,a
+        jr z,.noInterlace
+        set 3,e
+.noInterlace:
+        bit 1,a
+        jr z,.noEvenOdd
+        set 2,e
+.noEvenOdd:
+        ld a,(RG9SAV)
+        and $F3
+        or e
+        ld b,a
+        ld c,$09
+        push hl
+        call WriteVdpReg
+        pop hl
+        ret
 
 ; StatementKey: KEY ON, KEY OFF, KEY LIST, KEY n, text.
 StatementKey:
@@ -540,7 +588,7 @@ StatementVpoke:
         ex de,hl
         call WriteVramBig
         pop hl
-        ret
+        jp VramBankZero
 
 ; StatementOut: OUT port, value.
 StatementOut:

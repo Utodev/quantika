@@ -28,6 +28,11 @@ SubInputFile    equ FrsxServices + 66
 SubLineInputFile equ FrsxServices + 69
 SubInputFileChars equ FrsxServices + 72
 SubEof          equ FrsxServices + 75
-FrsxServicesEnd equ FrsxServices + 78
+SubNsetcx       equ FrsxServices + 78      ; (the main ROM's NSETCX and PNTINI: bios/pixel.asm)
+SubPntini       equ FrsxServices + 81
+SubGet          equ FrsxServices + 84
+SubPromptText   equ FrsxServices + 87      ; (SET PROMPT's text at BUF, Z; NZ for "Ok")
+SubSpriteFunction equ FrsxServices + 90
+FrsxServicesEnd equ FrsxServices + 93
 
 FileColumn      equ 6                   ; (a file control block's column, basic/files.asm)

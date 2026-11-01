@@ -1,0 +1,1 @@
+10 defint a-z:a=0:b=0:c=0:d=0:k=0\n20 print fre(0):?1;fre(0)\n30 a=fre(0):b=(fre(0)):c=2*(1+(fre(0)))/2:d=abs(fre(0))\n40 for k=-12 to 12:if fre(0)=a+k then print k;\n50 next:print a;b;c;d\n60 gosub 100:end\n100 print fre(0):return\nrun\nprint fre(0)\na=fre(0):print a\n
